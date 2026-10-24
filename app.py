@@ -282,10 +282,15 @@ if change_choice:
 st.subheader("3. Veri tablosu")
 
 display_df = df[["Tarih"] + list(SERIES.keys())].copy()
+
+# Önce gerçek tarih değerine göre sırala
+display_df = display_df.sort_values("Tarih", ascending=False)
+
+# Sıralama tamamlandıktan sonra tarihi ekranda gösterilecek biçime çevir
 display_df["Tarih"] = display_df["Tarih"].dt.strftime("%d.%m.%Y")
 
 st.dataframe(
-    display_df.sort_values("Tarih", ascending=False),
+    display_df,
     use_container_width=True,
     hide_index=True
 )
