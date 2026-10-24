@@ -191,58 +191,11 @@ def figure_to_png(fig, chart_type):
     return output.getvalue()
 
 
-def send_dashboard_email(fig, fig_change, latest_date):
-    gmail_address = st.secrets["gmail_address"]
-    gmail_app_password = st.secrets["gmail_app_password"]
-    recipient = "ysfagar42@gmail.com"
 
-    # Chrome gerektirmeyen PNG oluşturma
-    chart1_png = figure_to_png(fig, "line")
-    chart2_png = figure_to_png(fig_change, "bar")
+    msg.add_alternative(html, subtype="html")
+    html_part = msg.get_payload()[-1]
 
-    msg = EmailMessage()
-    msg["Subject"] = (
-        f"TCMB Döviz Mevduat Dashboard - {latest_date}"
-    )
-    msg["From"] = gmail_address
-    msg["To"] = recipient
-
-    msg.set_content(
-        "TCMB Döviz Mevduat Dashboard\n"
-        f"Son gözlem tarihi: {latest_date}\n\n"
-        "İlk grafik döviz mevduatlarının seyrini, "
-        "ikinci grafik parite etkisinden arındırılmış "
-        "değişim serilerini göstermektedir.\n"
-        "Veri kaynağı: TCMB EVDS.\n"
-        "İki grafik PNG dosyaları olarak eklenmiştir."
-    )
-
-    html = f"""
-    <html>
-      <body>
-        <h2>TCMB Döviz Mevduat Dashboard</h2>
-        <p><b>Son gözlem tarihi:</b> {latest_date}</p>
-        <p>
-          İlk grafik, seçilen döviz mevduatı serilerinin
-          zaman içindeki seyrini gösterir.
-        </p>
-        <p>
-          İkinci grafik, seçilen parite etkisinden arındırılmış
-          değişim serilerini gösterir. Bu değerler mevduat
-          seviyesiyle karıştırılmamalıdır.
-        </p>
-        <p><b>Veri kaynağı:</b> TCMB EVDS.</p>
-        <h3>1. Döviz mevduatlarının seyri</h3>
-        <img src="cid:chart1" style="width:100%; max-width:900px;">
-        <h3>2. Parite etkisinden arındırılmış değişim</h3>
-        <img src="cid:chart2" style="width:100%; max-width:900px;">
-      </body>
-    </html>
-    """
-
-msg.add_alternative(html, subtype="html")
-html_part = msg.get_payload()[-1]
-    # Grafikleri e-postanın gövdesinde de göster
+    # Grafikleri e-postanın gövdesinde göster
     html_part.add_related(
         chart1_png,
         maintype="image",
@@ -261,7 +214,7 @@ html_part = msg.get_payload()[-1]
         disposition="inline"
     )
 
-    # PNG dosyalarını ayrıca indirilebilir ek olarak gönder
+    # PNG dosyalarını ayrıca indirilebilir ek olarak da gönder
     msg.add_attachment(
         chart1_png,
         maintype="image",
