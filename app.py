@@ -1,8 +1,13 @@
+
 import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+import smtplib
+
 from datetime import date
+from email.message import EmailMessage
+
 
 st.set_page_config(
     page_title="TCMB Döviz Mevduat Dashboard",
@@ -29,7 +34,6 @@ SERIES = {
 
 
 def normalize_column(name):
-    """Seri kodlarını farklı JSON sütun adlarıyla eşleştirir."""
     return "".join(ch.lower() for ch in str(name) if ch.isalnum())
 
 
@@ -54,10 +58,8 @@ def fetch_evds_data(start_date, end_date):
         timeout=60
     )
     response.raise_for_status()
-
     raw = response.json()
 
-    # API cevabını tabloya dönüştür
     if isinstance(raw, dict):
         if "items" in raw:
             raw = raw["items"]
@@ -75,7 +77,6 @@ def fetch_evds_data(start_date, end_date):
             "EVDS veri döndürmedi. Tarih aralığını ve seri kodlarını kontrol et."
         )
 
-    # Tarih sütununu bul
     date_col = next(
         (
             col for col in df.columns
@@ -96,7 +97,6 @@ def fetch_evds_data(start_date, end_date):
         errors="coerce"
     )
 
-    # EVDS seri kodları JSON'da farklı biçimde gelebilir.
     for display_name, code in SERIES.items():
         target = normalize_column(code)
 
@@ -121,21 +121,116 @@ def fetch_evds_data(start_date, end_date):
             errors="coerce"
         )
 
-        df = df.dropna(subset=["Tarih"])
+    df = df.dropna(subset=["Tarih"])
     df = df.sort_values("Tarih").drop_duplicates("Tarih")
+
     fetched_at = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
     return df, fetched_at
 
 
-# Kullanıcı tarih aralığını seçebilir
+def send_dashboard_email(fig, fig_change, latest_date):
+    # Gizli bilgiler Streamlit Secrets'ten okunur.
+    gmail_address = st.secrets["gmail_address"]
+    gmail_app_password = st.secrets["gmail_app_password"]
+    recipient = "ysfagar42@gmail.com"
+
+    # Grafikleri PNG formatına dönüştür.
+    chart1_png = fig.to_image(
+        format="png", width=1200, height=650, scale=2
+    )
+    chart2_png = fig_change.to_image(
+        format="png", width=1200, height=650, scale=2
+    )
+
+    msg = EmailMessage()
+    msg["Subject"] = f"TCMB Döviz Mevduat Dashboard - {latest_date}"
+    msg["From"] = gmail_address
+    msg["To"] = recipient
+
+    msg.set_content(
+        "TCMB Döviz Mevduat Dashboard\n"
+        f"Son gözlem tarihi: {latest_date}\n\n"
+        "E-postada iki grafik bulunmaktadır. "
+        "Grafikler ayrıca PNG dosyaları olarak eklenmiştir.\n"
+        "Veri kaynağı: TCMB EVDS."
+    )
+
+    html = f"""
+    <html>
+      <body>
+        <h2>TCMB Döviz Mevduat Dashboard</h2>
+        <p>
+          <b>Son gözlem tarihi:</b> {latest_date}
+        </p>
+        <p>
+          İlk grafik, seçilen döviz mevduatı serilerinin zaman içindeki
+          seyrini gösterir. İkinci grafik, seçilen parite etkisinden
+          arındırılmış değişim serilerini gösterir.
+        </p>
+        <p>
+          Veriler TCMB EVDS kaynaklıdır. Mevduat seviyesi ve değişim
+          serilerinin farklı göstergeler olduğuna dikkat edilmelidir.
+        </p>
+        <h3>1. Döviz mevduatlarının seyri</h3>
+        <img src="cid:chart1" style="width:100%; max-width:900px;">
+        <h3>2. Parite etkisinden arındırılmış değişim</h3>
+        <img src="cid:chart2" style="width:100%; max-width:900px;">
+      </body>
+    </html>
+    """
+
+    html_part = msg.add_alternative(html, subtype="html")
+
+    # Grafikleri e-postanın içinde göster.
+    html_part.add_related(
+        chart1_png,
+        maintype="image",
+        subtype="png",
+        cid="<chart1>",
+        filename="doviz_mevduat_seviyesi.png",
+        disposition="inline"
+    )
+    html_part.add_related(
+        chart2_png,
+        maintype="image",
+        subtype="png",
+        cid="<chart2>",
+        filename="parite_etkisinden_arindirilmis_degisim.png",
+        disposition="inline"
+    )
+
+    # Aynı grafikleri ayrıca indirilebilir ek olarak da gönder.
+    msg.add_attachment(
+        chart1_png,
+        maintype="image",
+        subtype="png",
+        filename="doviz_mevduat_seviyesi.png"
+    )
+    msg.add_attachment(
+        chart2_png,
+        maintype="image",
+        subtype="png",
+        filename="parite_etkisinden_arindirilmis_degisim.png"
+    )
+
+    # Gmail üzerinden güvenli bağlantı kur ve gönder.
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+        server.starttls()
+        server.login(gmail_address, gmail_app_password)
+        server.send_message(msg)
+
+
+# Tarih filtreleri
 with st.sidebar:
     st.header("Filtreler")
+
     start = st.date_input(
         "Başlangıç tarihi",
         value=date(2025, 1, 1),
         min_value=date(2000, 1, 1),
         max_value=date.today()
     )
+
     end = st.date_input(
         "Bitiş tarihi",
         value=date.today(),
@@ -154,9 +249,9 @@ if start > end:
 try:
     with st.spinner("TCMB EVDS verileri alınıyor..."):
         df, fetched_at = fetch_evds_data(
-    start.strftime("%d-%m-%Y"),
-    end.strftime("%d-%m-%Y")
-)
+            start.strftime("%d-%m-%Y"),
+            end.strftime("%d-%m-%Y")
+        )
 
 except Exception as e:
     st.error("TCMB verileri alınamadı.")
@@ -174,14 +269,17 @@ if df.empty:
 latest = df.iloc[-1]
 previous = df.iloc[-2] if len(df) >= 2 else None
 
+latest_date = latest["Tarih"].strftime("%d.%m.%Y")
+
 st.caption(
-    f"Son gözlem tarihi: {latest['Tarih'].strftime('%d.%m.%Y')} "
+    f"Son gözlem tarihi: {latest_date} "
     f"| Son EVDS kontrolü: {fetched_at} "
     "| Birim: milyon ABD doları"
 )
 
 # Üst göstergeler
 col1, col2, col3, col4 = st.columns(4)
+
 
 def show_metric(column, label, series_name):
     value = latest[series_name]
@@ -191,6 +289,7 @@ def show_metric(column, label, series_name):
         return
 
     delta = None
+
     if previous is not None:
         old_value = previous[series_name]
         if pd.notna(old_value):
@@ -211,7 +310,7 @@ show_metric(col4, "Tüzel kişiler", "Tüzel Kişiler")
 
 st.divider()
 
-# Mevduat seviyeleri
+# 1. Mevduat seviyeleri
 st.subheader("1. Döviz mevduatlarının seyri")
 
 level_choice = st.multiselect(
@@ -222,11 +321,10 @@ level_choice = st.multiselect(
         "Gerçek Kişiler",
         "Tüzel Kişiler"
     ],
-    default=[
-        "Gerçek Kişiler",
-        "Tüzel Kişiler"
-    ]
+    default=["Gerçek Kişiler", "Tüzel Kişiler"]
 )
+
+fig = None
 
 if level_choice:
     fig = px.line(
@@ -243,7 +341,7 @@ if level_choice:
     fig.update_layout(hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-# Haftalık değişimler
+# 2. Haftalık değişimler
 st.subheader("2. Parite etkisinden arındırılmış değişim")
 
 st.caption(
@@ -263,6 +361,8 @@ change_choice = st.multiselect(
     ]
 )
 
+fig_change = None
+
 if change_choice:
     change_df = df[["Tarih"] + change_choice].copy()
 
@@ -279,18 +379,42 @@ if change_choice:
     )
     st.plotly_chart(fig_change, use_container_width=True)
 
-# Veri tablosu ve indirme
+# E-posta gönderme butonu
+st.divider()
+st.subheader("Dashboard'u e-posta ile gönder")
+
+st.caption(
+    "İki grafik e-postanın içinde görüntülenir ve PNG dosyaları "
+    "olarak ayrıca eklenir. E-posta yalnızca butona bastığında gönderilir."
+)
+
+if st.button(
+    "📧 E-posta ile Gönder",
+    disabled=(fig is None or fig_change is None)
+):
+    try:
+        with st.spinner("Grafikler hazırlanıyor ve e-posta gönderiliyor..."):
+            send_dashboard_email(fig, fig_change, latest_date)
+
+        st.success(
+            "E-posta başarıyla gönderildi: ysfagar42@gmail.com"
+        )
+
+    except Exception as e:
+        st.error("E-posta gönderilemedi.")
+        st.write(
+            "Hata ayrıntısı aşağıda. PNG dışa aktarma, "
+            "Gmail erişimi veya Secrets ayarlarıyla ilgili olabilir."
+        )
+        st.code(str(e))
+
+# Veri tablosu ve CSV indirme
 st.subheader("3. Veri tablosu")
 
 display_df = df[["Tarih"] + list(SERIES.keys())].copy()
-
-# En güncel tarih en üstte
 display_df = display_df.sort_values("Tarih", ascending=False)
-
-# Tarihi okunabilir göster
 display_df["Tarih"] = display_df["Tarih"].dt.strftime("%d.%m.%Y")
 
-# Sayıları binlik ayraç ve 2 ondalık basamakla göster
 for col in SERIES.keys():
     display_df[col] = display_df[col].apply(
         lambda x: f"{x:,.2f}" if pd.notna(x) else "-"
