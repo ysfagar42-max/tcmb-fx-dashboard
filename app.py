@@ -121,11 +121,10 @@ def fetch_evds_data(start_date, end_date):
             errors="coerce"
         )
 
-    df = df.dropna(subset=["Tarih"])
+        df = df.dropna(subset=["Tarih"])
     df = df.sort_values("Tarih").drop_duplicates("Tarih")
-
     fetched_at = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
-return df, fetched_at
+    return df, fetched_at
 
 
 # Kullanıcı tarih aralığını seçebilir
