@@ -698,27 +698,75 @@ yp_latest = yp_df.iloc[-1]
 # SEVİYE KARTLARI: SADECE TOPLAM / GERÇEK / TÜZEL
 # ---------------------------------------------------------
 
+# ---------------------------------------------------------
+# SEVİYE KARTLARI: TOPLAM / GERÇEK / TÜZEL + HAFTALIK DELTA
+# ---------------------------------------------------------
+
 st.subheader(
     f"Mevduat Seviyeleri — {yp_latest['Tarih'].strftime('%d.%m.%Y')}"
 )
 
 c1, c2, c3 = st.columns(3)
 
-c1.metric(
-    "Toplam YP Mevduat",
-    f"{yp_latest['Toplam YP Mevduat']:,.2f}",
-)
+card_data = [
+    (c1, "Toplam YP Mevduat", "#263B5A"),
+    (c2, "Gerçek Kişiler", "#247BA0"),
+    (c3, "Tüzel Kişiler", "#F28E2B"),
+]
 
-c2.metric(
-    "Gerçek Kişiler",
-    f"{yp_latest['Gerçek Kişiler']:,.2f}",
-)
+for col, series_name, color in card_data:
+    current_value = latest_value(yp_df, series_name)
+    weekly_delta = latest_difference(yp_df, series_name)
 
-c3.metric(
-    "Tüzel Kişiler",
-    f"{yp_latest['Tüzel Kişiler']:,.2f}",
-)
-
+    with col:
+        st.markdown(
+            f"""
+            <div style="
+                border: 1px solid #E5E7EB;
+                border-radius: 12px;
+                padding: 18px;
+                min-height: 145px;
+            ">
+                <div style="
+                    font-size: 14px;
+                    color: #6B7280;
+                    margin-bottom: 8px;
+                ">
+                    {series_name}
+                </div>
+                <div style="
+                    font-size: 27px;
+                    font-weight: 700;
+                    color: {color};
+                ">
+                    {current_value:,.2f}
+                </div>
+                <div style="
+                    font-size: 12px;
+                    color: #6B7280;
+                    margin-top: 14px;
+                ">
+                    Haftalık değişim
+                </div>
+                <div style="
+                    font-size: 17px;
+                    font-weight: 600;
+                    color: {
+                        '#16A34A' if pd.notna(weekly_delta) and weekly_delta > 0
+                        else '#DC2626' if pd.notna(weekly_delta) and weekly_delta < 0
+                        else '#6B7280'
+                    };
+                ">
+                    {
+                        f'{weekly_delta:+,.2f}'
+                        if pd.notna(weekly_delta)
+                        else 'Veri yok'
+                    }
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # ---------------------------------------------------------
 # ANA GRAFİK: TOPLAM / GERÇEK / TÜZEL
