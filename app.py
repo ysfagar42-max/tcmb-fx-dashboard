@@ -33,7 +33,7 @@ def normalize_column(name):
     return "".join(ch.lower() for ch in str(name) if ch.isalnum())
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def fetch_evds_data(start_date, end_date):
     api_key = st.secrets["evds_api_key"]
 
@@ -124,7 +124,8 @@ def fetch_evds_data(start_date, end_date):
     df = df.dropna(subset=["Tarih"])
     df = df.sort_values("Tarih").drop_duplicates("Tarih")
 
-    return df
+    fetched_at = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
+return df, fetched_at
 
 
 # Kullanıcı tarih aralığını seçebilir
@@ -153,10 +154,10 @@ if start > end:
 
 try:
     with st.spinner("TCMB EVDS verileri alınıyor..."):
-        df = fetch_evds_data(
-            start.strftime("%d-%m-%Y"),
-            end.strftime("%d-%m-%Y")
-        )
+        df, fetched_at = fetch_evds_data(
+    start.strftime("%d-%m-%Y"),
+    end.strftime("%d-%m-%Y")
+)
 
 except Exception as e:
     st.error("TCMB verileri alınamadı.")
@@ -176,6 +177,7 @@ previous = df.iloc[-2] if len(df) >= 2 else None
 
 st.caption(
     f"Son gözlem tarihi: {latest['Tarih'].strftime('%d.%m.%Y')} "
+    f"| Son EVDS kontrolü: {fetched_at} "
     "| Birim: milyon ABD doları"
 )
 
