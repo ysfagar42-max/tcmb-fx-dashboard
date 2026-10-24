@@ -283,11 +283,17 @@ st.subheader("3. Veri tablosu")
 
 display_df = df[["Tarih"] + list(SERIES.keys())].copy()
 
-# Önce gerçek tarih değerine göre sırala
+# En güncel tarih en üstte
 display_df = display_df.sort_values("Tarih", ascending=False)
 
-# Sıralama tamamlandıktan sonra tarihi ekranda gösterilecek biçime çevir
+# Tarihi okunabilir göster
 display_df["Tarih"] = display_df["Tarih"].dt.strftime("%d.%m.%Y")
+
+# Sayıları binlik ayraç ve 2 ondalık basamakla göster
+for col in SERIES.keys():
+    display_df[col] = display_df[col].apply(
+        lambda x: f"{x:,.2f}" if pd.notna(x) else "-"
+    )
 
 st.dataframe(
     display_df,
