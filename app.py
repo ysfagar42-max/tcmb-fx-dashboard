@@ -1,12 +1,13 @@
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from io import BytesIO
+
 import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import smtplib
 
+from io import BytesIO
 from datetime import date
 from email.message import EmailMessage
 
@@ -21,6 +22,7 @@ st.title("TCMB Döviz Mevduat Dashboard")
 st.caption(
     "Kaynak: TCMB EVDS | Yurt içi yerleşiklerin döviz mevduatları"
 )
+
 
 # EVDS seri kodları
 SERIES = {
@@ -131,6 +133,7 @@ def fetch_evds_data(start_date, end_date):
 
 
 def figure_to_png(fig, chart_type):
+    """Plotly grafiğindeki serileri Matplotlib ile PNG'ye dönüştürür."""
     image, ax = plt.subplots(figsize=(12, 6.5), dpi=160)
     traces = list(fig.data)
     count = len(traces)
@@ -143,6 +146,7 @@ def figure_to_png(fig, chart_type):
             dates = mdates.date2num(x.to_pydatetime())
             width = 2.5
             offset = (i - (count - 1) / 2) * width
+
             ax.bar(
                 dates + offset,
                 y,
@@ -150,62 +154,84 @@ def figure_to_png(fig, chart_type):
                 label=trace.name
             )
         else:
-            ax.plot(x, y, label=trace.name, linewidth=2)
+            ax.plot(
+                x,
+                y,
+                label=trace.name,
+                linewidth=2
+            )
 
     ax.set_xlabel("Tarih")
-    ax.set_ylabel(
-        "Milyon ABD doları"
-        if chart_type == "line"
-        else "EVDS değeri"
-    )
+
+    if chart_type == "line":
+        ax.set_ylabel("Milyon ABD doları")
+        ax.set_title("Döviz mevduatlarının seyri")
+    else:
+        ax.set_ylabel("EVDS değeri")
+        ax.set_title("Parite etkisinden arındırılmış değişim")
+
     ax.grid(True, alpha=0.25)
     ax.legend()
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m.%Y"))
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%d.%m.%Y")
+    )
+
     image.autofmt_xdate()
     image.tight_layout()
 
     output = BytesIO()
-    image.savefig(output, format="png", dpi=160, bbox_inches="tight")
+    image.savefig(
+        output,
+        format="png",
+        dpi=160,
+        bbox_inches="tight"
+    )
     plt.close(image)
+
     return output.getvalue()
 
+
 def send_dashboard_email(fig, fig_change, latest_date):
-    # Gizli bilgiler Streamlit Secrets'ten okunur.
     gmail_address = st.secrets["gmail_address"]
     gmail_app_password = st.secrets["gmail_app_password"]
     recipient = "ysfagar42@gmail.com"
 
-   chart1_png = figure_to_png(fig, "line")
-chart2_png = figure_to_png(fig_change, "bar")
+    # Chrome gerektirmeyen PNG oluşturma
+    chart1_png = figure_to_png(fig, "line")
+    chart2_png = figure_to_png(fig_change, "bar")
+
     msg = EmailMessage()
-    msg["Subject"] = f"TCMB Döviz Mevduat Dashboard - {latest_date}"
+    msg["Subject"] = (
+        f"TCMB Döviz Mevduat Dashboard - {latest_date}"
+    )
     msg["From"] = gmail_address
     msg["To"] = recipient
 
     msg.set_content(
         "TCMB Döviz Mevduat Dashboard\n"
         f"Son gözlem tarihi: {latest_date}\n\n"
-        "E-postada iki grafik bulunmaktadır. "
-        "Grafikler ayrıca PNG dosyaları olarak eklenmiştir.\n"
-        "Veri kaynağı: TCMB EVDS."
+        "İlk grafik döviz mevduatlarının seyrini, "
+        "ikinci grafik parite etkisinden arındırılmış "
+        "değişim serilerini göstermektedir.\n"
+        "Veri kaynağı: TCMB EVDS.\n"
+        "İki grafik PNG dosyaları olarak eklenmiştir."
     )
 
     html = f"""
     <html>
       <body>
         <h2>TCMB Döviz Mevduat Dashboard</h2>
+        <p><b>Son gözlem tarihi:</b> {latest_date}</p>
         <p>
-          <b>Son gözlem tarihi:</b> {latest_date}
+          İlk grafik, seçilen döviz mevduatı serilerinin
+          zaman içindeki seyrini gösterir.
         </p>
         <p>
-          İlk grafik, seçilen döviz mevduatı serilerinin zaman içindeki
-          seyrini gösterir. İkinci grafik, seçilen parite etkisinden
-          arındırılmış değişim serilerini gösterir.
+          İkinci grafik, seçilen parite etkisinden arındırılmış
+          değişim serilerini gösterir. Bu değerler mevduat
+          seviyesiyle karıştırılmamalıdır.
         </p>
-        <p>
-          Veriler TCMB EVDS kaynaklıdır. Mevduat seviyesi ve değişim
-          serilerinin farklı göstergeler olduğuna dikkat edilmelidir.
-        </p>
+        <p><b>Veri kaynağı:</b> TCMB EVDS.</p>
         <h3>1. Döviz mevduatlarının seyri</h3>
         <img src="cid:chart1" style="width:100%; max-width:900px;">
         <h3>2. Parite etkisinden arındırılmış değişim</h3>
@@ -216,7 +242,7 @@ chart2_png = figure_to_png(fig_change, "bar")
 
     html_part = msg.add_alternative(html, subtype="html")
 
-    # Grafikleri e-postanın içinde göster.
+    # Grafikleri e-postanın gövdesinde de göster
     html_part.add_related(
         chart1_png,
         maintype="image",
@@ -225,6 +251,7 @@ chart2_png = figure_to_png(fig_change, "bar")
         filename="doviz_mevduat_seviyesi.png",
         disposition="inline"
     )
+
     html_part.add_related(
         chart2_png,
         maintype="image",
@@ -234,13 +261,14 @@ chart2_png = figure_to_png(fig_change, "bar")
         disposition="inline"
     )
 
-    # Aynı grafikleri ayrıca indirilebilir ek olarak da gönder.
+    # PNG dosyalarını ayrıca indirilebilir ek olarak gönder
     msg.add_attachment(
         chart1_png,
         maintype="image",
         subtype="png",
         filename="doviz_mevduat_seviyesi.png"
     )
+
     msg.add_attachment(
         chart2_png,
         maintype="image",
@@ -248,7 +276,6 @@ chart2_png = figure_to_png(fig_change, "bar")
         filename="parite_etkisinden_arindirilmis_degisim.png"
     )
 
-    # Gmail üzerinden güvenli bağlantı kur ve gönder.
     with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
         server.starttls()
         server.login(gmail_address, gmail_app_password)
@@ -277,9 +304,11 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
+
 if start > end:
     st.error("Başlangıç tarihi bitiş tarihinden sonra olamaz.")
     st.stop()
+
 
 try:
     with st.spinner("TCMB EVDS verileri alınıyor..."):
@@ -297,13 +326,14 @@ except Exception as e:
     st.code(str(e))
     st.stop()
 
+
 if df.empty:
     st.warning("Seçilen tarih aralığında veri bulunamadı.")
     st.stop()
 
+
 latest = df.iloc[-1]
 previous = df.iloc[-2] if len(df) >= 2 else None
-
 latest_date = latest["Tarih"].strftime("%d.%m.%Y")
 
 st.caption(
@@ -311,6 +341,7 @@ st.caption(
     f"| Son EVDS kontrolü: {fetched_at} "
     "| Birim: milyon ABD doları"
 )
+
 
 # Üst göstergeler
 col1, col2, col3, col4 = st.columns(4)
@@ -345,6 +376,7 @@ show_metric(col4, "Tüzel kişiler", "Tüzel Kişiler")
 
 st.divider()
 
+
 # 1. Mevduat seviyeleri
 st.subheader("1. Döviz mevduatlarının seyri")
 
@@ -376,7 +408,8 @@ if level_choice:
     fig.update_layout(hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-# 2. Haftalık değişimler
+
+# 2. Parite etkisinden arındırılmış değişim
 st.subheader("2. Parite etkisinden arındırılmış değişim")
 
 st.caption(
@@ -414,13 +447,14 @@ if change_choice:
     )
     st.plotly_chart(fig_change, use_container_width=True)
 
-# E-posta gönderme butonu
+
+# E-posta gönderme
 st.divider()
 st.subheader("Dashboard'u e-posta ile gönder")
 
 st.caption(
-    "İki grafik e-postanın içinde görüntülenir ve PNG dosyaları "
-    "olarak ayrıca eklenir. E-posta yalnızca butona bastığında gönderilir."
+    "İki grafik e-posta içinde gösterilir ve PNG dosyaları "
+    "olarak ayrıca eklenir. Gönderim yalnızca butona basınca yapılır."
 )
 
 if st.button(
@@ -428,7 +462,9 @@ if st.button(
     disabled=(fig is None or fig_change is None)
 ):
     try:
-        with st.spinner("Grafikler hazırlanıyor ve e-posta gönderiliyor..."):
+        with st.spinner(
+            "Grafikler hazırlanıyor ve e-posta gönderiliyor..."
+        ):
             send_dashboard_email(fig, fig_change, latest_date)
 
         st.success(
@@ -437,11 +473,9 @@ if st.button(
 
     except Exception as e:
         st.error("E-posta gönderilemedi.")
-        st.write(
-            "Hata ayrıntısı aşağıda. PNG dışa aktarma, "
-            "Gmail erişimi veya Secrets ayarlarıyla ilgili olabilir."
-        )
+        st.write("Hata ayrıntısı:")
         st.code(str(e))
+
 
 # Veri tablosu ve CSV indirme
 st.subheader("3. Veri tablosu")
