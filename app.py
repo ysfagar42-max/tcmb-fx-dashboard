@@ -132,7 +132,7 @@ with st.sidebar:
     st.header("Filtreler")
     start = st.date_input(
         "Başlangıç tarihi",
-        value=date(2015, 1, 1),
+        value=date(2025, 1, 1),
         min_value=date(2000, 1, 1),
         max_value=date.today()
     )
