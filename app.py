@@ -130,20 +130,53 @@ def fetch_evds_data(start_date, end_date):
     return df, fetched_at
 
 
+def figure_to_png(fig, chart_type):
+    image, ax = plt.subplots(figsize=(12, 6.5), dpi=160)
+    traces = list(fig.data)
+    count = len(traces)
+
+    for i, trace in enumerate(traces):
+        x = pd.to_datetime(list(trace.x), errors="coerce")
+        y = pd.to_numeric(list(trace.y), errors="coerce")
+
+        if chart_type == "bar":
+            dates = mdates.date2num(x.to_pydatetime())
+            width = 2.5
+            offset = (i - (count - 1) / 2) * width
+            ax.bar(
+                dates + offset,
+                y,
+                width=width,
+                label=trace.name
+            )
+        else:
+            ax.plot(x, y, label=trace.name, linewidth=2)
+
+    ax.set_xlabel("Tarih")
+    ax.set_ylabel(
+        "Milyon ABD doları"
+        if chart_type == "line"
+        else "EVDS değeri"
+    )
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m.%Y"))
+    image.autofmt_xdate()
+    image.tight_layout()
+
+    output = BytesIO()
+    image.savefig(output, format="png", dpi=160, bbox_inches="tight")
+    plt.close(image)
+    return output.getvalue()
+
 def send_dashboard_email(fig, fig_change, latest_date):
     # Gizli bilgiler Streamlit Secrets'ten okunur.
     gmail_address = st.secrets["gmail_address"]
     gmail_app_password = st.secrets["gmail_app_password"]
     recipient = "ysfagar42@gmail.com"
 
-    # Grafikleri PNG formatına dönüştür.
-    chart1_png = fig.to_image(
-        format="png", width=1200, height=650, scale=2
-    )
-    chart2_png = fig_change.to_image(
-        format="png", width=1200, height=650, scale=2
-    )
-
+   chart1_png = figure_to_png(fig, "line")
+chart2_png = figure_to_png(fig_change, "bar")
     msg = EmailMessage()
     msg["Subject"] = f"TCMB Döviz Mevduat Dashboard - {latest_date}"
     msg["From"] = gmail_address
