@@ -240,7 +240,8 @@ def send_dashboard_email(fig, fig_change, latest_date):
     </html>
     """
 
-    html_part = msg.add_alternative(html, subtype="html")
+    msg.add_alternative(html, subtype="html")
+html_part = msg.get_payload()[-1]
 
     # Grafikleri e-postanın gövdesinde de göster
     html_part.add_related(
