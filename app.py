@@ -12,6 +12,10 @@ from datetime import date
 from email.message import EmailMessage
 
 
+# --------------------------------------------------
+# SAYFA AYARLARI
+# --------------------------------------------------
+
 st.set_page_config(
     page_title="TCMB Döviz Mevduat Dashboard",
     page_icon="📊",
@@ -24,7 +28,10 @@ st.caption(
 )
 
 
-# EVDS seri kodları
+# --------------------------------------------------
+# EVDS SERİLERİ
+# --------------------------------------------------
+
 SERIES = {
     "Toplam YP Mevduat": "TP.HPBITABLO4.1",
     "Yurt İçi Yerleşikler": "TP.HPBITABLO4.2",
@@ -38,15 +45,20 @@ SERIES = {
 
 
 def normalize_column(name):
-    return "".join(ch.lower() for ch in str(name) if ch.isalnum())
+    return "".join(
+        ch.lower() for ch in str(name) if ch.isalnum()
+    )
 
+
+# --------------------------------------------------
+# EVDS VERİSİNİ ÇEK
+# --------------------------------------------------
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_evds_data(start_date, end_date):
     api_key = st.secrets["evds_api_key"]
 
-    series_codes = list(SERIES.values())
-    series_string = "-".join(series_codes)
+    series_string = "-".join(SERIES.values())
 
     url = (
         "https://evds3.tcmb.gov.tr/igmevdsms-dis/"
@@ -62,6 +74,7 @@ def fetch_evds_data(start_date, end_date):
         timeout=60
     )
     response.raise_for_status()
+
     raw = response.json()
 
     if isinstance(raw, dict):
@@ -95,6 +108,7 @@ def fetch_evds_data(start_date, end_date):
         )
 
     df = df.rename(columns={date_col: "Tarih"})
+
     df["Tarih"] = pd.to_datetime(
         df["Tarih"],
         dayfirst=True,
@@ -129,21 +143,31 @@ def fetch_evds_data(start_date, end_date):
     df = df.sort_values("Tarih").drop_duplicates("Tarih")
 
     fetched_at = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
+
     return df, fetched_at
 
 
+# --------------------------------------------------
+# PLOTLY GRAFİĞİNİ PNG'YE DÖNÜŞTÜR
+# Chrome veya Kaleido gerektirmez.
+# --------------------------------------------------
+
 def figure_to_png(fig, chart_type):
-    """Plotly grafiğindeki serileri Matplotlib ile PNG'ye dönüştürür."""
     image, ax = plt.subplots(figsize=(12, 6.5), dpi=160)
+
     traces = list(fig.data)
     count = len(traces)
 
     for i, trace in enumerate(traces):
         x = pd.to_datetime(list(trace.x), errors="coerce")
-        y = pd.to_numeric(list(trace.y), errors="coerce")
+        y = pd.to_numeric(
+            pd.Series(list(trace.y)),
+            errors="coerce"
+        ).to_numpy()
 
         if chart_type == "bar":
             dates = mdates.date2num(x.to_pydatetime())
+
             width = 2.5
             offset = (i - (count - 1) / 2) * width
 
@@ -172,6 +196,7 @@ def figure_to_png(fig, chart_type):
 
     ax.grid(True, alpha=0.25)
     ax.legend()
+
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%d.%m.%Y")
     )
@@ -180,22 +205,88 @@ def figure_to_png(fig, chart_type):
     image.tight_layout()
 
     output = BytesIO()
+
     image.savefig(
         output,
         format="png",
         dpi=160,
         bbox_inches="tight"
     )
+
     plt.close(image)
 
     return output.getvalue()
 
 
+# --------------------------------------------------
+# E-POSTA GÖNDER
+# --------------------------------------------------
+
+def send_dashboard_email(fig, fig_change, latest_date):
+    gmail_address = st.secrets["gmail_address"]
+    gmail_app_password = st.secrets["gmail_app_password"]
+
+    recipient = "ysfagar42@gmail.com"
+
+    # İki grafiği PNG olarak oluştur.
+    chart1_png = figure_to_png(fig, "line")
+    chart2_png = figure_to_png(fig_change, "bar")
+
+    msg = EmailMessage()
+
+    msg["Subject"] = (
+        f"TCMB Döviz Mevduat Dashboard - {latest_date}"
+    )
+    msg["From"] = gmail_address
+    msg["To"] = recipient
+
+    # HTML görüntülenemeyen e-posta uygulamaları için metin içeriği.
+    msg.set_content(
+        "TCMB Döviz Mevduat Dashboard\n"
+        f"Son gözlem tarihi: {latest_date}\n\n"
+        "İlk grafik seçilen döviz mevduatı serilerinin seyrini, "
+        "ikinci grafik parite etkisinden arındırılmış değişimleri "
+        "göstermektedir.\n"
+        "Veri kaynağı: TCMB EVDS.\n"
+        "İki grafik PNG dosyaları olarak eklenmiştir."
+    )
+
+    # HTML e-posta içeriği.
+    html = f"""
+    <html>
+      <body>
+        <h2>TCMB Döviz Mevduat Dashboard</h2>
+
+        <p><b>Son gözlem tarihi:</b> {latest_date}</p>
+
+        <p>
+          İlk grafik, seçilen döviz mevduatı serilerinin
+          zaman içindeki seyrini göstermektedir.
+        </p>
+
+        <p>
+          İkinci grafik, seçilen parite etkisinden arındırılmış
+          değişim serilerini göstermektedir. Bu değerler mevduat
+          seviyesiyle karıştırılmamalıdır.
+        </p>
+
+        <p><b>Veri kaynağı:</b> TCMB EVDS.</p>
+
+        <h3>1. Döviz mevduatlarının seyri</h3>
+        <img src="cid:chart1" style="width:100%; max-width:900px;">
+
+        <h3>2. Parite etkisinden arındırılmış değişim</h3>
+        <img src="cid:chart2" style="width:100%; max-width:900px;">
+      </body>
+    </html>
+    """
 
     msg.add_alternative(html, subtype="html")
+
+    # HTML bölümünü al.
     html_part = msg.get_payload()[-1]
 
-    # Grafikleri e-postanın gövdesinde göster
+    # Grafikleri e-postanın gövdesinde göster.
     html_part.add_related(
         chart1_png,
         maintype="image",
@@ -214,7 +305,7 @@ def figure_to_png(fig, chart_type):
         disposition="inline"
     )
 
-    # PNG dosyalarını ayrıca indirilebilir ek olarak da gönder
+    # Grafikleri ayrıca indirilebilir dosya eki olarak ekle.
     msg.add_attachment(
         chart1_png,
         maintype="image",
@@ -229,13 +320,24 @@ def figure_to_png(fig, chart_type):
         filename="parite_etkisinden_arindirilmis_degisim.png"
     )
 
-    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+    # Gmail üzerinden gönder.
+    with smtplib.SMTP(
+        "smtp.gmail.com",
+        587,
+        timeout=30
+    ) as server:
         server.starttls()
-        server.login(gmail_address, gmail_app_password)
+        server.login(
+            gmail_address,
+            gmail_app_password
+        )
         server.send_message(msg)
 
 
-# Tarih filtreleri
+# --------------------------------------------------
+# TARİH FİLTRELERİ
+# --------------------------------------------------
+
 with st.sidebar:
     st.header("Filtreler")
 
@@ -263,6 +365,10 @@ if start > end:
     st.stop()
 
 
+# --------------------------------------------------
+# VERİLERİ YÜKLE
+# --------------------------------------------------
+
 try:
     with st.spinner("TCMB EVDS verileri alınıyor..."):
         df, fetched_at = fetch_evds_data(
@@ -272,10 +378,12 @@ try:
 
 except Exception as e:
     st.error("TCMB verileri alınamadı.")
+
     st.write(
         "Streamlit Secrets, API bağlantısı ve seri kodlarını "
         "kontrol et. Hata ayrıntısı:"
     )
+
     st.code(str(e))
     st.stop()
 
@@ -287,6 +395,7 @@ if df.empty:
 
 latest = df.iloc[-1]
 previous = df.iloc[-2] if len(df) >= 2 else None
+
 latest_date = latest["Tarih"].strftime("%d.%m.%Y")
 
 st.caption(
@@ -296,7 +405,10 @@ st.caption(
 )
 
 
-# Üst göstergeler
+# --------------------------------------------------
+# ÜST GÖSTERGELER
+# --------------------------------------------------
+
 col1, col2, col3, col4 = st.columns(4)
 
 
@@ -311,6 +423,7 @@ def show_metric(column, label, series_name):
 
     if previous is not None:
         old_value = previous[series_name]
+
         if pd.notna(old_value):
             delta = value - old_value
 
@@ -330,7 +443,10 @@ show_metric(col4, "Tüzel kişiler", "Tüzel Kişiler")
 st.divider()
 
 
-# 1. Mevduat seviyeleri
+# --------------------------------------------------
+# 1. DÖVİZ MEVDUATLARININ SEYRİ
+# --------------------------------------------------
+
 st.subheader("1. Döviz mevduatlarının seyri")
 
 level_choice = st.multiselect(
@@ -341,7 +457,10 @@ level_choice = st.multiselect(
         "Gerçek Kişiler",
         "Tüzel Kişiler"
     ],
-    default=["Gerçek Kişiler", "Tüzel Kişiler"]
+    default=[
+        "Gerçek Kişiler",
+        "Tüzel Kişiler"
+    ]
 )
 
 fig = None
@@ -358,11 +477,19 @@ if level_choice:
             "variable": "Seri"
         }
     )
+
     fig.update_layout(hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
 
 
-# 2. Parite etkisinden arındırılmış değişim
+# --------------------------------------------------
+# 2. PARİTE ETKİSİNDEN ARINDIRILMIŞ DEĞİŞİM
+# --------------------------------------------------
+
 st.subheader("2. Parite etkisinden arındırılmış değişim")
 
 st.caption(
@@ -398,16 +525,23 @@ if change_choice:
             "variable": "Seri"
         }
     )
-    st.plotly_chart(fig_change, use_container_width=True)
+
+    st.plotly_chart(
+        fig_change,
+        use_container_width=True
+    )
 
 
-# E-posta gönderme
+# --------------------------------------------------
+# E-POSTA BUTONU
+# --------------------------------------------------
+
 st.divider()
 st.subheader("Dashboard'u e-posta ile gönder")
 
 st.caption(
     "İki grafik e-posta içinde gösterilir ve PNG dosyaları "
-    "olarak ayrıca eklenir. Gönderim yalnızca butona basınca yapılır."
+    "olarak ayrıca eklenir. Gönderim yalnızca butona bastığında yapılır."
 )
 
 if st.button(
@@ -418,7 +552,11 @@ if st.button(
         with st.spinner(
             "Grafikler hazırlanıyor ve e-posta gönderiliyor..."
         ):
-            send_dashboard_email(fig, fig_change, latest_date)
+            send_dashboard_email(
+                fig,
+                fig_change,
+                latest_date
+            )
 
         st.success(
             "E-posta başarıyla gönderildi: ysfagar42@gmail.com"
@@ -430,12 +568,22 @@ if st.button(
         st.code(str(e))
 
 
-# Veri tablosu ve CSV indirme
+# --------------------------------------------------
+# VERİ TABLOSU VE CSV İNDİRME
+# --------------------------------------------------
+
 st.subheader("3. Veri tablosu")
 
 display_df = df[["Tarih"] + list(SERIES.keys())].copy()
-display_df = display_df.sort_values("Tarih", ascending=False)
-display_df["Tarih"] = display_df["Tarih"].dt.strftime("%d.%m.%Y")
+
+display_df = display_df.sort_values(
+    "Tarih",
+    ascending=False
+)
+
+display_df["Tarih"] = display_df["Tarih"].dt.strftime(
+    "%d.%m.%Y"
+)
 
 for col in SERIES.keys():
     display_df[col] = display_df[col].apply(
