@@ -1,4 +1,3 @@
-import io
 import smtplib
 import requests
 import pandas as pd
@@ -43,7 +42,7 @@ EMAIL_RECIPIENT = "ysfagar42@gmail.com"
 
 
 # =========================================================
-# YP DTH SEVİYE SERİLERİ
+# YP DTH SERİLERİ
 # =========================================================
 
 YP_LEVEL_SERIES = {
@@ -52,49 +51,44 @@ YP_LEVEL_SERIES = {
     "Gerçek Kişiler": "TP.HPBITABLO4.3",
     "Gerçek Kişiler - USD": "TP.HPBITABLO4.4",
     "Gerçek Kişiler - EUR": "TP.HPBITABLO4.5",
-    "Gerçek Kişiler - Diğer": "TP.HPBITABLO4.6",
+    "Gerçek Kişiler - Diğer Döviz": "TP.HPBITABLO4.6",
     "Gerçek Kişiler - Altın": "TP.HPBITABLO4.7",
     "Tüzel Kişiler": "TP.HPBITABLO4.8",
     "Tüzel Kişiler - USD": "TP.HPBITABLO4.9",
     "Tüzel Kişiler - EUR": "TP.HPBITABLO4.10",
-    "Tüzel Kişiler - Diğer": "TP.HPBITABLO4.11",
+    "Tüzel Kişiler - Diğer Döviz": "TP.HPBITABLO4.11",
     "Tüzel Kişiler - Altın": "TP.HPBITABLO4.12",
     "Yurt İçi Yerleşik Bankalar": "TP.HPBITABLO4.13",
     "Yurt Dışı Yerleşikler": "TP.HPBITABLO4.16",
     "Yurt Dışı Yerleşikler - USD": "TP.HPBITABLO4.17",
     "Yurt Dışı Yerleşikler - EUR": "TP.HPBITABLO4.18",
-    "Yurt Dışı Yerleşikler - Diğer": "TP.HPBITABLO4.19",
+    "Yurt Dışı Yerleşikler - Diğer Döviz": "TP.HPBITABLO4.19",
     "Yurt Dışı Yerleşikler - Altın": "TP.HPBITABLO4.20",
     "Yurt Dışı Yerleşik Bankalar": "TP.HPBITABLO4.21",
 }
-
-
-# =========================================================
-# YP PARİTE HARİÇ DEĞİŞİM VE PARİTE ETKİSİ SERİLERİ
-# =========================================================
 
 YP_CHANGE_SERIES = {
     "Parite Hariç - Yurt İçi Yerleşikler": "TP.HPBITABLO5.1",
     "Parite Hariç - Gerçek Kişiler": "TP.HPBITABLO5.2",
     "Parite Hariç - Gerçek Kişiler USD": "TP.HPBITABLO5.3",
     "Parite Hariç - Gerçek Kişiler EUR": "TP.HPBITABLO5.4",
-    "Parite Hariç - Gerçek Kişiler Diğer": "TP.HPBITABLO5.5",
+    "Parite Hariç - Gerçek Kişiler Diğer Döviz": "TP.HPBITABLO5.5",
     "Parite Hariç - Gerçek Kişiler Altın": "TP.HPBITABLO5.6",
     "Parite Hariç - Tüzel Kişiler": "TP.HPBITABLO5.7",
     "Parite Hariç - Tüzel Kişiler USD": "TP.HPBITABLO5.8",
     "Parite Hariç - Tüzel Kişiler EUR": "TP.HPBITABLO5.9",
-    "Parite Hariç - Tüzel Kişiler Diğer": "TP.HPBITABLO5.10",
+    "Parite Hariç - Tüzel Kişiler Diğer Döviz": "TP.HPBITABLO5.10",
     "Parite Hariç - Tüzel Kişiler Altın": "TP.HPBITABLO5.11",
     "Parite Etkisi - Yurt İçi Yerleşikler": "TP.HPBITABLO5.12",
     "Parite Etkisi - Gerçek Kişiler": "TP.HPBITABLO5.13",
     "Parite Etkisi - Gerçek Kişiler USD": "TP.HPBITABLO5.14",
     "Parite Etkisi - Gerçek Kişiler EUR": "TP.HPBITABLO5.15",
-    "Parite Etkisi - Gerçek Kişiler Diğer": "TP.HPBITABLO5.16",
+    "Parite Etkisi - Gerçek Kişiler Diğer Döviz": "TP.HPBITABLO5.16",
     "Parite Etkisi - Gerçek Kişiler Altın": "TP.HPBITABLO5.17",
     "Parite Etkisi - Tüzel Kişiler": "TP.HPBITABLO5.18",
     "Parite Etkisi - Tüzel Kişiler USD": "TP.HPBITABLO5.19",
     "Parite Etkisi - Tüzel Kişiler EUR": "TP.HPBITABLO5.20",
-    "Parite Etkisi - Tüzel Kişiler Diğer": "TP.HPBITABLO5.21",
+    "Parite Etkisi - Tüzel Kişiler Diğer Döviz": "TP.HPBITABLO5.21",
     "Parite Etkisi - Tüzel Kişiler Altın": "TP.HPBITABLO5.22",
 }
 
@@ -125,46 +119,19 @@ TL_SERIES = {
 
 
 # =========================================================
-# KIRILIMLAR VE GÖSTERİM BİRİMLERİ
+# GRAFİK RENKLERİ
 # =========================================================
 
-BREAKDOWN = {
-    "USD": {
-        "individual_level": "Gerçek Kişiler - USD",
-        "corporate_level": "Tüzel Kişiler - USD",
-        "individual_adjusted": "Parite Hariç - Gerçek Kişiler USD",
-        "corporate_adjusted": "Parite Hariç - Tüzel Kişiler USD",
-        "individual_parity": "Parite Etkisi - Gerçek Kişiler USD",
-        "corporate_parity": "Parite Etkisi - Tüzel Kişiler USD",
-        "unit": "Milyon ABD doları",
-    },
-    "EUR": {
-        "individual_level": "Gerçek Kişiler - EUR",
-        "corporate_level": "Tüzel Kişiler - EUR",
-        "individual_adjusted": "Parite Hariç - Gerçek Kişiler EUR",
-        "corporate_adjusted": "Parite Hariç - Tüzel Kişiler EUR",
-        "individual_parity": "Parite Etkisi - Gerçek Kişiler EUR",
-        "corporate_parity": "Parite Etkisi - Tüzel Kişiler EUR",
-        "unit": "Milyon euro",
-    },
-    "Diğer Döviz": {
-        "individual_level": "Gerçek Kişiler - Diğer",
-        "corporate_level": "Tüzel Kişiler - Diğer",
-        "individual_adjusted": "Parite Hariç - Gerçek Kişiler Diğer",
-        "corporate_adjusted": "Parite Hariç - Tüzel Kişiler Diğer",
-        "individual_parity": "Parite Etkisi - Gerçek Kişiler Diğer",
-        "corporate_parity": "Parite Etkisi - Tüzel Kişiler Diğer",
-        "unit": "Milyon ABD doları karşılığı",
-    },
-    "Altın": {
-        "individual_level": "Gerçek Kişiler - Altın",
-        "corporate_level": "Tüzel Kişiler - Altın",
-        "individual_adjusted": "Parite Hariç - Gerçek Kişiler Altın",
-        "corporate_adjusted": "Parite Hariç - Tüzel Kişiler Altın",
-        "individual_parity": "Parite Etkisi - Gerçek Kişiler Altın",
-        "corporate_parity": "Parite Etkisi - Tüzel Kişiler Altın",
-        "unit": "Altın mevduatı",
-    },
+COLORS = {
+    "Toplam YP Mevduat": "#263B5A",
+    "Gerçek Kişiler": "#247BA0",
+    "Tüzel Kişiler": "#F28E2B",
+    "Yurt İçi Yerleşikler": "#59A14F",
+}
+
+SEGMENT_COLORS = {
+    "Gerçek Kişiler": "#247BA0",
+    "Tüzel Kişiler": "#F28E2B",
 }
 
 
@@ -247,11 +214,7 @@ def parse_evds_response(raw, series_dict):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_evds_data(start_date, end_date, series_items):
-    """
-    Serileri 10'arlı gruplar halinde çeker.
-    fetched_at, verinin gerçekten EVDS'den alındığı zamanı gösterir.
-    Cache kullanıldığında çekim zamanı da cache ile birlikte korunur.
-    """
+    """EVDS verilerini gruplar halinde çeker ve son çekim zamanını saklar."""
     series_dict = dict(series_items)
     series_list = list(series_dict.items())
     frames = []
@@ -275,8 +238,10 @@ def fetch_evds_data(start_date, end_date, series_items):
         )
         response.raise_for_status()
 
-        parsed = parse_evds_response(response.json(), chunk)
-        frames.append(parsed)
+        frames.append(parse_evds_response(response.json(), chunk))
+
+    if not frames:
+        raise ValueError("EVDS'den veri alınamadı.")
 
     result = frames[0]
 
@@ -293,22 +258,44 @@ def fetch_evds_data(start_date, end_date, series_items):
         )
 
     result = result.sort_values("Tarih").reset_index(drop=True)
-    fetched_at = datetime.now().astimezone().strftime("%d.%m.%Y %H:%M:%S %Z")
+
+    fetched_at = datetime.now().astimezone().strftime(
+        "%d.%m.%Y %H:%M:%S %Z"
+    )
 
     return result, fetched_at
 
 
 def show_data_status(df, fetched_at):
-    if df.empty:
-        observation_date = "Veri yok"
-    else:
-        observation_date = df["Tarih"].max().strftime("%d.%m.%Y")
+    observation_date = (
+        df["Tarih"].max().strftime("%d.%m.%Y")
+        if not df.empty
+        else "Veri yok"
+    )
 
     st.caption(
         f"**Son veri çekimi:** {fetched_at}  |  "
         f"**Son gözlem tarihi:** {observation_date}  |  "
-        "Veriler 1 saat önbellekte tutulur."
+        "Önbellek süresi: 1 saat"
     )
+
+
+def latest_value(df, column):
+    if column not in df.columns or df.empty:
+        return float("nan")
+    return df.iloc[-1][column]
+
+
+def latest_difference(df, column, periods=1):
+    if column not in df.columns or len(df) <= periods:
+        return float("nan")
+    return df[column].iloc[-1] - df[column].iloc[-1 - periods]
+
+
+def format_value(value, decimals=2):
+    if pd.isna(value):
+        return "Veri yok"
+    return f"{value:+,.{decimals}f}"
 
 
 def fig_to_png(fig):
@@ -372,52 +359,6 @@ def show_date_filters(key_prefix):
     )
 
 
-def latest_value(df, column):
-    if column not in df.columns or df.empty:
-        return float("nan")
-    return df.iloc[-1][column]
-
-
-def format_value(value, unit="", decimals=2):
-    if pd.isna(value):
-        return "Veri yok"
-    return f"{value:+,.{decimals}f} {unit}".strip()
-
-
-def latest_difference(df, column, periods=1):
-    if column not in df.columns or len(df) <= periods:
-        return float("nan")
-    return df[column].iloc[-1] - df[column].iloc[-1 - periods]
-
-
-def rename_tl_csv_columns(df):
-    rename_map = {}
-
-    for name in TL_SERIES:
-        if name in df.columns:
-            rename_map[name] = f"{name} (Trilyon TL)"
-
-    amount_columns = {
-        "Haftalık Değişim": "Haftalık Değişim (Milyar TL)",
-        "4 Haftalık Değişim": "4 Haftalık Değişim (Milyar TL)",
-        "13 Haftalık Değişim": "13 Haftalık Değişim (Milyar TL)",
-    }
-
-    rename_map.update(amount_columns)
-
-    percent_columns = [
-        "Haftalık Değişim (%)",
-        "4 Haftalık Değişim (%)",
-        "13 Haftalık Değişim (%)",
-    ]
-
-    for col in percent_columns:
-        if col in df.columns:
-            rename_map[col] = col
-
-    return df.rename(columns=rename_map)
-
-
 # =========================================================
 # PANEL SEÇİMİ
 # =========================================================
@@ -459,11 +400,14 @@ if panel == "TL Mevduat":
         st.error("Toplam TL Mevduat serisi bulunamadı.")
         st.stop()
 
-    # EVDS TL serileri milyon TL varsayımıyla trilyon TL'ye çevrilir.
-    tl_df[available_tl_columns] = tl_df[available_tl_columns] / 1_000_000
+    # Milyon TL -> trilyon TL
+    tl_df[available_tl_columns] = (
+        tl_df[available_tl_columns] / 1_000_000
+    )
 
     total_col = "Toplam TL Mevduat"
 
+    # Seviye: trilyon TL; değişim: milyar TL
     tl_df["Haftalık Değişim"] = tl_df[total_col].diff() * 1000
     tl_df["Haftalık Değişim (%)"] = tl_df[total_col].pct_change() * 100
 
@@ -538,7 +482,6 @@ if panel == "TL Mevduat":
         "Banka Dışı Finansal Kuruluşlar",
     ]
     person_columns = [c for c in person_columns if c in tl_df.columns]
-
     fig_person = None
 
     if person_columns:
@@ -573,7 +516,6 @@ if panel == "TL Mevduat":
         "Banka Dışı Finansal Kuruluşlar - Vadeli",
     ]
     maturity_columns = [c for c in maturity_columns if c in tl_df.columns]
-
     fig_maturity = None
 
     if maturity_columns:
@@ -620,7 +562,7 @@ if panel == "TL Mevduat":
         hide_index=True,
     )
 
-    st.subheader("4 Haftalık Değişim Tablos")
+    st.subheader("4 Haftalık Değişim Tablosu")
 
     four_table = tl_df[
         ["Tarih", total_col, "4 Haftalık Değişim", "4 Haftalık Değişim (%)"]
@@ -652,7 +594,18 @@ if panel == "TL Mevduat":
 
     st.subheader("Veri İndirme")
 
-    csv_df = rename_tl_csv_columns(tl_df.copy())
+    csv_df = tl_df.copy()
+    csv_rename = {
+        name: f"{name} (Trilyon TL)"
+        for name in TL_SERIES
+        if name in csv_df.columns
+    }
+    csv_rename.update({
+        "Haftalık Değişim": "Haftalık Değişim (Milyar TL)",
+        "4 Haftalık Değişim": "4 Haftalık Değişim (Milyar TL)",
+        "13 Haftalık Değişim": "13 Haftalık Değişim (Milyar TL)",
+    })
+    csv_df = csv_df.rename(columns=csv_rename)
 
     st.download_button(
         "TL Mevduat CSV İndir",
@@ -682,13 +635,9 @@ if panel == "TL Mevduat":
 
             send_email(
                 "TL Mevduat Analiz Raporu",
-                (
-                    "TL Mevduat Analiz Dashboard raporu ektedir.\n"
-                    "Seviyeler trilyon TL, değişim tutarları milyar TL'dir."
-                ),
+                "TL Mevduat Analiz Dashboard raporu ektedir.",
                 attachments,
             )
-
             st.success("E-posta başarıyla gönderildi.")
 
         except Exception as e:
@@ -722,281 +671,354 @@ with st.spinner("YP DTH verileri getiriliyor..."):
 
 show_data_status(yp_df, yp_fetched_at)
 
-if yp_df.empty or "Toplam YP Mevduat" not in yp_df.columns:
+if yp_df.empty:
+    st.error("Seçilen tarih aralığında YP verisi bulunamadı.")
+    st.stop()
+
+required_columns = [
+    "Toplam YP Mevduat",
+    "Gerçek Kişiler",
+    "Tüzel Kişiler",
+]
+
+missing_columns = [c for c in required_columns if c not in yp_df.columns]
+
+if missing_columns:
     st.error(
-        "YP mevduat verileri bulunamadı. "
-        "EVDS seri kodlarını ve dönen sütun adlarını kontrol et."
+        "YP serilerinden bazıları bulunamadı: "
+        + ", ".join(missing_columns)
+        + ". EVDS seri kodlarını ve API yanıtını kontrol et."
     )
     st.stop()
 
 yp_df = yp_df.sort_values("Tarih").reset_index(drop=True)
 yp_latest = yp_df.iloc[-1]
-latest_date = yp_latest["Tarih"].strftime("%d.%m.%Y")
 
 # ---------------------------------------------------------
-# ÜST KARTLAR: MEVDUAT SEVİYELERİ
+# SEVİYE KARTLARI: SADECE TOPLAM / GERÇEK / TÜZEL
 # ---------------------------------------------------------
 
-st.subheader(f"Son Gözlem: {latest_date}")
-
-c1, c2, c3, c4 = st.columns(4)
-
-for col, name in zip(
-    [c1, c2, c3, c4],
-    [
-        "Toplam YP Mevduat",
-        "Yurt İçi Yerleşikler",
-        "Gerçek Kişiler",
-        "Tüzel Kişiler",
-    ],
-):
-    value = latest_value(yp_df, name)
-    col.metric(name, f"{value:,.2f}" if pd.notna(value) else "Veri yok")
-
-st.caption(
-    "YP seviye serileri EVDS'nin ilgili serilerinde yayımlanan birimlerle "
-    "gösterilir. Kırılım grafiklerinde USD, EUR ve diğer döviz serileri "
-    "ayrı ayrı incelenir."
+st.subheader(
+    f"Mevduat Seviyeleri — {yp_latest['Tarih'].strftime('%d.%m.%Y')}"
 )
 
+c1, c2, c3 = st.columns(3)
 
-# ---------------------------------------------------------
-# HAFTALIK NOMİNAL DELTA VE PARİTE AYRIŞIMI
-# ---------------------------------------------------------
-
-st.subheader("Haftalık YP Mevduat Hareketi")
-
-nominal_total = latest_difference(yp_df, "Toplam YP Mevduat")
-nominal_domestic = latest_difference(yp_df, "Yurt İçi Yerleşikler")
-nominal_individual = latest_difference(yp_df, "Gerçek Kişiler")
-nominal_corporate = latest_difference(yp_df, "Tüzel Kişiler")
-
-adjusted_domestic = latest_value(
-    yp_df, "Parite Hariç - Yurt İçi Yerleşikler"
-)
-parity_domestic = latest_value(
-    yp_df, "Parite Etkisi - Yurt İçi Yerleşikler"
-)
-
-d1, d2, d3, d4 = st.columns(4)
-
-d1.metric(
-    "Toplam YP — Haftalık nominal değişim",
-    format_value(nominal_total),
-)
-d2.metric(
-    "Yurt İçi Yerleşikler — Haftalık değişim",
-    format_value(nominal_domestic),
-)
-d3.metric(
-    "Gerçek Kişiler — Haftalık değişim",
-    format_value(nominal_individual),
-)
-d4.metric(
-    "Tüzel Kişiler — Haftalık değişim",
-    format_value(nominal_corporate),
-)
-
-p1, p2, p3 = st.columns(3)
-
-p1.metric(
-    "Yurt İçi Yerleşikler — Nominal değişim",
-    format_value(nominal_domestic),
-)
-p2.metric(
-    "Parite hariç değişim",
-    format_value(adjusted_domestic),
-)
-p3.metric(
-    "Parite etkisi",
-    format_value(parity_domestic),
-)
-
-st.caption(
-    "Nominal değişim, seviye serisinin son iki gözlemi arasındaki farktır. "
-    "Parite hariç değişim ve parite etkisi ilgili EVDS serilerinden alınır. "
-    "Serilerin yayımlandığı birimler korunur."
-)
-
-
-# ---------------------------------------------------------
-# GENEL YP MEVDUAT GELİŞİMİ
-# ---------------------------------------------------------
-
-st.subheader("YP Mevduat Gelişimi")
-
-yp_level_columns = [
+c1.metric(
     "Toplam YP Mevduat",
-    "Yurt İçi Yerleşikler",
+    f"{yp_latest['Toplam YP Mevduat']:,.2f}",
+)
+
+c2.metric(
+    "Gerçek Kişiler",
+    f"{yp_latest['Gerçek Kişiler']:,.2f}",
+)
+
+c3.metric(
+    "Tüzel Kişiler",
+    f"{yp_latest['Tüzel Kişiler']:,.2f}",
+)
+
+
+# ---------------------------------------------------------
+# ANA GRAFİK: TOPLAM / GERÇEK / TÜZEL
+# ---------------------------------------------------------
+
+st.subheader("Toplam YP Mevduat, Gerçek Kişiler ve Tüzel Kişiler")
+
+main_columns = [
+    "Toplam YP Mevduat",
     "Gerçek Kişiler",
     "Tüzel Kişiler",
 ]
-yp_level_columns = [c for c in yp_level_columns if c in yp_df.columns]
 
-yp_long = yp_df[["Tarih"] + yp_level_columns].melt(
+main_long = yp_df[["Tarih"] + main_columns].melt(
     id_vars="Tarih",
-    var_name="Mevduat Türü",
-    value_name="Değer",
+    var_name="Mevduat Grubu",
+    value_name="Tutar",
 )
 
 fig_yp = px.line(
-    yp_long,
+    main_long,
     x="Tarih",
-    y="Değer",
-    color="Mevduat Türü",
+    y="Tutar",
+    color="Mevduat Grubu",
+    color_discrete_map=COLORS,
     title="YP Mevduat Seviyeleri",
-    labels={"Tarih": "Tarih", "Değer": "Seri değeri"},
+    labels={
+        "Tarih": "Tarih",
+        "Tutar": "Seri değeri",
+        "Mevduat Grubu": "Mevduat Grubu",
+    },
 )
-fig_yp.update_layout(hovermode="x unified")
+
+fig_yp.update_traces(line=dict(width=3))
+fig_yp.update_layout(
+    hovermode="x unified",
+    legend_title_text="Mevduat Grubu",
+)
 st.plotly_chart(fig_yp, use_container_width=True)
 
 
 # ---------------------------------------------------------
-# USD / EUR / DİĞER DÖVİZ / ALTIN
+# ANA GRUPLARIN HAFTALIK NOMİNAL DEĞİŞİMİ
+# ---------------------------------------------------------
+
+st.subheader("Toplam, Gerçek ve Tüzel Kişiler — Haftalık Nominal Değişim")
+
+delta_df = yp_df[["Tarih"] + main_columns].copy()
+
+for col in main_columns:
+    delta_df[col] = delta_df[col].diff()
+
+delta_long = delta_df.melt(
+    id_vars="Tarih",
+    var_name="Mevduat Grubu",
+    value_name="Haftalık Nominal Değişim",
+)
+
+fig_main_delta = px.bar(
+    delta_long,
+    x="Tarih",
+    y="Haftalık Nominal Değişim",
+    color="Mevduat Grubu",
+    color_discrete_map=COLORS,
+    barmode="group",
+    title="Haftalık Nominal Değişim",
+    labels={
+        "Tarih": "Tarih",
+        "Haftalık Nominal Değişim": "Seri değerindeki değişim",
+        "Mevduat Grubu": "Mevduat Grubu",
+    },
+)
+
+fig_main_delta.update_layout(legend_title_text="Mevduat Grubu")
+st.plotly_chart(fig_main_delta, use_container_width=True)
+
+
+# ---------------------------------------------------------
+# USD / EUR / DİĞER DÖVİZ / ALTIN KIRILIMLARI
 # ---------------------------------------------------------
 
 st.subheader("USD, EUR, Diğer Döviz ve Altın Kırılımı")
 
-st.markdown(
-    "Grafikler gerçek kişiler ve tüzel kişiler için ayrı gösterilir. "
-    "Haftalık değişim tablolarında nominal değişim ile parite etkisinden "
-    "arındırılmış değişim ve parite etkisi birlikte yer alır."
+st.caption(
+    "Her grafikte gerçek kişiler ve tüzel kişiler ayrı çizgilerle gösterilir. "
+    "Haftalık değişim, ilgili seviye serisinin son iki gözlemi arasındaki "
+    "fark olarak hesaplanır."
 )
 
+BREAKDOWN = {
+    "USD": {
+        "individual": "Gerçek Kişiler - USD",
+        "corporate": "Tüzel Kişiler - USD",
+        "unit": "USD serisinin yayımlanan birimi",
+        "adjusted_individual": "Parite Hariç - Gerçek Kişiler USD",
+        "adjusted_corporate": "Parite Hariç - Tüzel Kişiler USD",
+        "parity_individual": "Parite Etkisi - Gerçek Kişiler USD",
+        "parity_corporate": "Parite Etkisi - Tüzel Kişiler USD",
+    },
+    "EUR": {
+        "individual": "Gerçek Kişiler - EUR",
+        "corporate": "Tüzel Kişiler - EUR",
+        "unit": "EUR serisinin yayımlanan birimi",
+        "adjusted_individual": "Parite Hariç - Gerçek Kişiler EUR",
+        "adjusted_corporate": "Parite Hariç - Tüzel Kişiler EUR",
+        "parity_individual": "Parite Etkisi - Gerçek Kişiler EUR",
+        "parity_corporate": "Parite Etkisi - Tüzel Kişiler EUR",
+    },
+    "Diğer Döviz": {
+        "individual": "Gerçek Kişiler - Diğer Döviz",
+        "corporate": "Tüzel Kişiler - Diğer Döviz",
+        "unit": "Serinin yayımlanan birimi",
+        "adjusted_individual": "Parite Hariç - Gerçek Kişiler Diğer Döviz",
+        "adjusted_corporate": "Parite Hariç - Tüzel Kişiler Diğer Döviz",
+        "parity_individual": "Parite Etkisi - Gerçek Kişiler Diğer Döviz",
+        "parity_corporate": "Parite Etkisi - Tüzel Kişiler Diğer Döviz",
+    },
+    "Altın": {
+        "individual": "Gerçek Kişiler - Altın",
+        "corporate": "Tüzel Kişiler - Altın",
+        "unit": "Altın serisinin yayımlanan birimi",
+        "adjusted_individual": "Parite Hariç - Gerçek Kişiler Altın",
+        "adjusted_corporate": "Parite Hariç - Tüzel Kişiler Altın",
+        "parity_individual": "Parite Etkisi - Gerçek Kişiler Altın",
+        "parity_corporate": "Parite Etkisi - Tüzel Kişiler Altın",
+    },
+}
+
 breakdown_rows = []
-breakdown_level_figures = []
-breakdown_delta_figures = []
+level_figures = []
+delta_figures = []
+parity_figures = []
 
-for asset, config in BREAKDOWN.items():
+for asset, cfg in BREAKDOWN.items():
 
-    individual_level_col = config["individual_level"]
-    corporate_level_col = config["corporate_level"]
-
-    individual_adjusted_col = config["individual_adjusted"]
-    corporate_adjusted_col = config["corporate_adjusted"]
-
-    individual_parity_col = config["individual_parity"]
-    corporate_parity_col = config["corporate_parity"]
-
-    unit = config["unit"]
+    individual_col = cfg["individual"]
+    corporate_col = cfg["corporate"]
 
     # Her varlık için seviye grafiği
-    level_columns = [
-        c for c in [individual_level_col, corporate_level_col]
-        if c in yp_df.columns
+    available = [
+        col for col in [individual_col, corporate_col]
+        if col in yp_df.columns
     ]
 
-    if level_columns:
-        level_long = yp_df[["Tarih"] + level_columns].melt(
+    if available:
+        level_long = yp_df[["Tarih"] + available].melt(
             id_vars="Tarih",
-            var_name="Mevduat Sahibi",
+            var_name="Seri",
             value_name="Tutar",
         )
 
-        level_long["Mevduat Sahibi"] = (
-            level_long["Mevduat Sahibi"]
-            .str.replace("Gerçek Kişiler - ", "", regex=False)
-            .str.replace("Tüzel Kişiler - ", "", regex=False)
-        )
+        # Seri adlarını "USD" gibi aynı etikete çevirmiyoruz.
+        # Böylece gerçek/tüzel ayrımı grafikte kaybolmuyor.
+        label_map = {
+            individual_col: "Gerçek Kişiler",
+            corporate_col: "Tüzel Kişiler",
+        }
+        level_long["Mevduat Sahibi"] = level_long["Seri"].map(label_map)
 
         fig_level = px.line(
             level_long,
             x="Tarih",
             y="Tutar",
             color="Mevduat Sahibi",
-            title=f"{asset} Mevduat Seviyesi",
+            color_discrete_map=SEGMENT_COLORS,
+            title=f"{asset} — Mevduat Seviyesi",
             labels={
                 "Tarih": "Tarih",
-                "Tutar": unit,
+                "Tutar": cfg["unit"],
                 "Mevduat Sahibi": "Mevduat Sahibi",
             },
         )
-        fig_level.update_yaxes(title_text=unit)
-        fig_level.update_layout(hovermode="x unified")
-        breakdown_level_figures.append((asset, fig_level))
+        fig_level.update_traces(line=dict(width=3))
+        fig_level.update_layout(
+            hovermode="x unified",
+            legend_title_text="Mevduat Sahibi",
+        )
+        level_figures.append((asset, fig_level))
 
-    # Gerçek kişiler ve tüzel kişiler için haftalık delta
-    for segment, level_col, adjusted_col, parity_col in [
-        (
-            "Gerçek Kişiler",
-            individual_level_col,
-            individual_adjusted_col,
-            individual_parity_col,
-        ),
-        (
-            "Tüzel Kişiler",
-            corporate_level_col,
-            corporate_adjusted_col,
-            corporate_parity_col,
-        ),
-    ]:
-        current_level = latest_value(yp_df, level_col)
-        nominal_delta = latest_difference(yp_df, level_col)
-        adjusted_delta = latest_value(yp_df, adjusted_col)
-        parity_delta = latest_value(yp_df, parity_col)
-
-        breakdown_rows.append({
-            "Döviz / Varlık": asset,
-            "Mevduat Sahibi": segment,
-            f"Mevcut Seviye ({unit})": current_level,
-            f"Nominal Haftalık Değişim ({unit})": nominal_delta,
-            f"Parite Hariç Değişim ({unit})": adjusted_delta,
-            f"Parite Etkisi ({unit})": parity_delta,
-        })
-
-    # Her varlık için nominal haftalık değişim grafiği
+    # Haftalık nominal delta grafiği
     delta_rows = []
 
     for segment, level_col in [
-        ("Gerçek Kişiler", individual_level_col),
-        ("Tüzel Kişiler", corporate_level_col),
+        ("Gerçek Kişiler", individual_col),
+        ("Tüzel Kişiler", corporate_col),
     ]:
-        if level_col not in yp_df.columns:
-            continue
+        if level_col in yp_df.columns:
+            temp = yp_df[["Tarih", level_col]].copy()
+            temp["Haftalık Nominal Değişim"] = temp[level_col].diff()
+            temp["Mevduat Sahibi"] = segment
 
-        temp = yp_df[["Tarih", level_col]].copy()
-        temp["Haftalık Nominal Değişim"] = temp[level_col].diff()
-        temp["Mevduat Sahibi"] = segment
-
-        delta_rows.append(
-            temp[["Tarih", "Haftalık Nominal Değişim", "Mevduat Sahibi"]]
-        )
+            delta_rows.append(
+                temp[["Tarih", "Haftalık Nominal Değişim", "Mevduat Sahibi"]]
+            )
 
     if delta_rows:
-        delta_long = pd.concat(delta_rows, ignore_index=True)
+        delta_long_asset = pd.concat(delta_rows, ignore_index=True)
 
         fig_delta = px.bar(
-            delta_long,
+            delta_long_asset,
             x="Tarih",
             y="Haftalık Nominal Değişim",
             color="Mevduat Sahibi",
+            color_discrete_map=SEGMENT_COLORS,
             barmode="group",
             title=f"{asset} — Haftalık Nominal Değişim",
             labels={
                 "Tarih": "Tarih",
-                "Haftalık Nominal Değişim": unit,
+                "Haftalık Nominal Değişim": cfg["unit"],
+                "Mevduat Sahibi": "Mevduat Sahibi",
             },
         )
-        fig_delta.update_yaxes(title_text=unit)
-        breakdown_delta_figures.append((asset, fig_delta))
+        fig_delta.update_layout(legend_title_text="Mevduat Sahibi")
+        delta_figures.append((asset, fig_delta))
+
+    # Tablo için son seviye ve haftalık değişim
+    for segment, level_col, adjusted_col, parity_col in [
+        (
+            "Gerçek Kişiler",
+            individual_col,
+            cfg["adjusted_individual"],
+            cfg["parity_individual"],
+        ),
+        (
+            "Tüzel Kişiler",
+            corporate_col,
+            cfg["adjusted_corporate"],
+            cfg["parity_corporate"],
+        ),
+    ]:
+        breakdown_rows.append({
+            "Döviz / Varlık": asset,
+            "Mevduat Sahibi": segment,
+            "Mevcut Seviye": latest_value(yp_df, level_col),
+            "Haftalık Nominal Değişim": latest_difference(yp_df, level_col),
+            "Parite Hariç Değişim": latest_value(yp_df, adjusted_col),
+            "Parite Etkisi": latest_value(yp_df, parity_col),
+        })
+
+    # Parite hariç değişim ve parite etkisini iki segment için ayrı grafikle
+    parity_rows = []
+
+    for segment, adjusted_col, parity_col in [
+        (
+            "Gerçek Kişiler",
+            cfg["adjusted_individual"],
+            cfg["parity_individual"],
+        ),
+        (
+            "Tüzel Kişiler",
+            cfg["adjusted_corporate"],
+            cfg["parity_corporate"],
+        ),
+    ]:
+        for series_name, col_name in [
+            ("Parite Hariç Değişim", adjusted_col),
+            ("Parite Etkisi", parity_col),
+        ]:
+            if col_name in yp_df.columns:
+                temp = yp_df[["Tarih", col_name]].copy()
+                temp["Değişim Türü"] = series_name
+                temp["Mevduat Sahibi"] = segment
+                temp = temp.rename(columns={col_name: "Değer"})
+                parity_rows.append(temp)
+
+    if parity_rows:
+        parity_long = pd.concat(parity_rows, ignore_index=True)
+
+        fig_parity = px.bar(
+            parity_long,
+            x="Tarih",
+            y="Değer",
+            color="Değişim Türü",
+            facet_row="Mevduat Sahibi",
+            barmode="group",
+            title=f"{asset} — Parite Hariç Değişim ve Parite Etkisi",
+            labels={
+                "Tarih": "Tarih",
+                "Değer": "Seri değeri",
+                "Değişim Türü": "Değişim Türü",
+            },
+        )
+        fig_parity.update_layout(hovermode="x unified")
+        parity_figures.append((asset, fig_parity))
 
 
 # Seviye grafikleri
-for asset, fig in breakdown_level_figures:
+st.markdown("#### Mevduat Seviyeleri")
+
+for asset, fig in level_figures:
     st.plotly_chart(fig, use_container_width=True)
 
-# Nominal haftalık değişim grafikleri
-st.subheader("Döviz ve Altın Kırılımlarında Haftalık Nominal Değişim")
+# Haftalık nominal delta grafikleri
+st.markdown("#### Haftalık Nominal Değişimler")
 
-for asset, fig in breakdown_delta_figures:
+for asset, fig in delta_figures:
     st.plotly_chart(fig, use_container_width=True)
 
-
-# ---------------------------------------------------------
-# HAFTALIK DELTA TABLOSU
-# ---------------------------------------------------------
-
-st.subheader("Döviz ve Altın Kırılımlarında Haftalık Delta")
+# Son hafta tablosu
+st.markdown("#### Son Haftanın Sayısal Özeti")
 
 breakdown_df = pd.DataFrame(breakdown_rows)
 
@@ -1005,130 +1027,40 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
     column_config={
-        col: st.column_config.NumberColumn(
-            col,
-            format="%+,.2f" if (
-                "Değişim" in col or "Parite Etkisi" in col
-            ) else "%,.2f",
-        )
-        for col in breakdown_df.columns
-        if col not in ["Döviz / Varlık", "Mevduat Sahibi"]
+        "Mevcut Seviye": st.column_config.NumberColumn(
+            "Mevcut Seviye",
+            format="%,.2f",
+        ),
+        "Haftalık Nominal Değişim": st.column_config.NumberColumn(
+            "Haftalık Nominal Değişim",
+            format="%+,.2f",
+        ),
+        "Parite Hariç Değişim": st.column_config.NumberColumn(
+            "Parite Hariç Değişim",
+            format="%+,.2f",
+        ),
+        "Parite Etkisi": st.column_config.NumberColumn(
+            "Parite Etkisi",
+            format="%+,.2f",
+        ),
     },
 )
 
 st.caption(
-    "Nominal haftalık değişim seviye serisinin son iki gözlemi arasındaki "
-    "farktır. Parite hariç değişim ve parite etkisi EVDS'nin ilgili "
-    "değişim serilerinden alınır. EUR tutarları euro cinsinden gösterilir; "
-    "diğer seriler kendi tanımlarındaki birimle gösterilir."
+    "Haftalık nominal değişim, ilgili seviyenin son iki gözlemi arasındaki "
+    "farkıdır. Parite hariç değişim ve parite etkisi ilgili EVDS serilerinden "
+    "alınır. Birimlerin doğru yorumlanması için EVDS serisinin açıklamasındaki "
+    "ölçü birimi esas alınmalıdır."
 )
 
-
-# ---------------------------------------------------------
-# PARİTE ANALİZİ
-# ---------------------------------------------------------
-
-st.subheader("Parite Hariç Değişim ve Parite Etkisi")
-
-change_options = [
-    "Yurt İçi Yerleşikler",
-    "Gerçek Kişiler",
-    "Tüzel Kişiler",
-    "Gerçek Kişiler USD",
-    "Gerçek Kişiler EUR",
-    "Gerçek Kişiler Diğer",
-    "Gerçek Kişiler Altın",
-    "Tüzel Kişiler USD",
-    "Tüzel Kişiler EUR",
-    "Tüzel Kişiler Diğer",
-    "Tüzel Kişiler Altın",
-]
-
-change_lookup = {
-    "Yurt İçi Yerleşikler": (
-        "Parite Hariç - Yurt İçi Yerleşikler",
-        "Parite Etkisi - Yurt İçi Yerleşikler",
-    ),
-    "Gerçek Kişiler": (
-        "Parite Hariç - Gerçek Kişiler",
-        "Parite Etkisi - Gerçek Kişiler",
-    ),
-    "Tüzel Kişiler": (
-        "Parite Hariç - Tüzel Kişiler",
-        "Parite Etkisi - Tüzel Kişiler",
-    ),
-    "Gerçek Kişiler USD": (
-        "Parite Hariç - Gerçek Kişiler USD",
-        "Parite Etkisi - Gerçek Kişiler USD",
-    ),
-    "Gerçek Kişiler EUR": (
-        "Parite Hariç - Gerçek Kişiler EUR",
-        "Parite Etkisi - Gerçek Kişiler EUR",
-    ),
-    "Gerçek Kişiler Diğer": (
-        "Parite Hariç - Gerçek Kişiler Diğer",
-        "Parite Etkisi - Gerçek Kişiler Diğer",
-    ),
-    "Gerçek Kişiler Altın": (
-        "Parite Hariç - Gerçek Kişiler Altın",
-        "Parite Etkisi - Gerçek Kişiler Altın",
-    ),
-    "Tüzel Kişiler USD": (
-        "Parite Hariç - Tüzel Kişiler USD",
-        "Parite Etkisi - Tüzel Kişiler USD",
-    ),
-    "Tüzel Kişiler EUR": (
-        "Parite Hariç - Tüzel Kişiler EUR",
-        "Parite Etkisi - Tüzel Kişiler EUR",
-    ),
-    "Tüzel Kişiler Diğer": (
-        "Parite Hariç - Tüzel Kişiler Diğer",
-        "Parite Etkisi - Tüzel Kişiler Diğer",
-    ),
-    "Tüzel Kişiler Altın": (
-        "Parite Hariç - Tüzel Kişiler Altın",
-        "Parite Etkisi - Tüzel Kişiler Altın",
-    ),
-}
-
-selected_change = st.selectbox(
-    "İncelenecek kırılım",
-    change_options,
-    key="yp_change_chart_selection",
-)
-
-adjusted_col, parity_col = change_lookup[selected_change]
-chart_columns = [
-    c for c in [adjusted_col, parity_col]
-    if c in yp_df.columns
-]
-
-fig_change = None
-
-if chart_columns:
-    change_long = yp_df[["Tarih"] + chart_columns].melt(
-        id_vars="Tarih",
-        var_name="Değişim Türü",
-        value_name="Değer",
-    )
-
-    fig_change = px.bar(
-        change_long,
-        x="Tarih",
-        y="Değer",
-        color="Değişim Türü",
-        barmode="group",
-        title=f"{selected_change}: Parite Hariç Değişim ve Parite Etkisi",
-        labels={"Tarih": "Tarih", "Değer": "Seri değeri"},
-    )
-    fig_change.update_layout(hovermode="x unified")
-    st.plotly_chart(fig_change, use_container_width=True)
-else:
-    st.warning("Seçilen kırılım için değişim serileri bulunamadı.")
+# Parite grafikleri ayrı bölümde
+with st.expander("Parite etkisi ayrıntılı grafikleri"):
+    for asset, fig in parity_figures:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------------------------------------------------------
-# YP VERİ TABLOSU VE CSV
+# VERİ TABLOSU VE CSV
 # ---------------------------------------------------------
 
 st.subheader("YP Mevduat Verileri")
@@ -1156,31 +1088,30 @@ st.subheader("Rapor Gönderimi")
 if st.button("YP DTH Raporunu E-posta ile Gönder"):
     try:
         attachments = [
-            ("yp_mevduat_gelisimi.png", fig_to_png(fig_yp)),
+            ("yp_toplam_gercek_tuzel.png", fig_to_png(fig_yp)),
+            ("yp_ana_gruplar_haftalik_delta.png", fig_to_png(fig_main_delta)),
         ]
 
-        for asset, fig in breakdown_level_figures:
+        for asset, fig in level_figures:
             attachments.append(
                 (f"{asset.lower().replace(' ', '_')}_seviye.png", fig_to_png(fig))
             )
 
-        for asset, fig in breakdown_delta_figures:
+        for asset, fig in delta_figures:
             attachments.append(
-                (f"{asset.lower().replace(' ', '_')}_haftalik_delta.png", fig_to_png(fig))
-            )
-
-        if fig_change is not None:
-            attachments.append(
-                ("yp_parite_analizi.png", fig_to_png(fig_change))
+                (
+                    f"{asset.lower().replace(' ', '_')}_haftalik_delta.png",
+                    fig_to_png(fig),
+                )
             )
 
         send_email(
             "YP DTH Analiz Raporu",
             (
                 "YP DTH Analiz Dashboard raporu ektedir.\n\n"
-                "Raporda toplam mevduat seviyeleri, haftalık nominal değişimler, "
-                "USD/EUR/diğer döviz/altın kırılımları ve parite etkisi "
-                "analizleri yer almaktadır."
+                "Raporda toplam YP mevduat, gerçek kişiler, tüzel kişiler, "
+                "USD/EUR/diğer döviz/altın seviyeleri ve haftalık nominal "
+                "değişimler yer almaktadır."
             ),
             attachments,
         )
