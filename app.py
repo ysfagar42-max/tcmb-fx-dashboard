@@ -329,7 +329,7 @@ def send_email(subject, body, attachments):
 
 def show_date_filters(key_prefix):
     today = date.today()
-    default_start = date(2025, 1, 1)
+    default_start = today - timedelta(days=365)
 
     col1, col2 = st.columns(2)
 
@@ -851,15 +851,16 @@ st.plotly_chart(fig_main_delta, use_container_width=True)
 st.subheader("USD, EUR, Diğer Döviz ve Altın Kırılımı")
 
 st.caption(
-    "Nominal değişim, mevduat seviyesinin son iki haftalık gözlemi arasındaki "
-    "farktır. Parite hariç değişim ve parite etkisi TCMB'nin ilgili EVDS "
-    "değişim serilerinden alınır."
+    "Her grafikte gerçek kişiler ve tüzel kişiler ayrı çizgilerle gösterilir. "
+    "Haftalık değişim, ilgili seviye serisinin son iki gözlemi arasındaki "
+    "fark olarak hesaplanır."
 )
 
 BREAKDOWN = {
     "USD": {
         "individual": "Gerçek Kişiler - USD",
         "corporate": "Tüzel Kişiler - USD",
+        "unit": "USD serisinin yayımlanan birimi",
         "adjusted_individual": "Parite Hariç - Gerçek Kişiler USD",
         "adjusted_corporate": "Parite Hariç - Tüzel Kişiler USD",
         "parity_individual": "Parite Etkisi - Gerçek Kişiler USD",
@@ -868,6 +869,7 @@ BREAKDOWN = {
     "EUR": {
         "individual": "Gerçek Kişiler - EUR",
         "corporate": "Tüzel Kişiler - EUR",
+        "unit": "EUR serisinin yayımlanan birimi",
         "adjusted_individual": "Parite Hariç - Gerçek Kişiler EUR",
         "adjusted_corporate": "Parite Hariç - Tüzel Kişiler EUR",
         "parity_individual": "Parite Etkisi - Gerçek Kişiler EUR",
@@ -876,6 +878,7 @@ BREAKDOWN = {
     "Diğer Döviz": {
         "individual": "Gerçek Kişiler - Diğer Döviz",
         "corporate": "Tüzel Kişiler - Diğer Döviz",
+        "unit": "Serinin yayımlanan birimi",
         "adjusted_individual": "Parite Hariç - Gerçek Kişiler Diğer Döviz",
         "adjusted_corporate": "Parite Hariç - Tüzel Kişiler Diğer Döviz",
         "parity_individual": "Parite Etkisi - Gerçek Kişiler Diğer Döviz",
@@ -884,6 +887,7 @@ BREAKDOWN = {
     "Altın": {
         "individual": "Gerçek Kişiler - Altın",
         "corporate": "Tüzel Kişiler - Altın",
+        "unit": "Altın serisinin yayımlanan birimi",
         "adjusted_individual": "Parite Hariç - Gerçek Kişiler Altın",
         "adjusted_corporate": "Parite Hariç - Tüzel Kişiler Altın",
         "parity_individual": "Parite Etkisi - Gerçek Kişiler Altın",
@@ -894,175 +898,176 @@ BREAKDOWN = {
 breakdown_rows = []
 level_figures = []
 delta_figures = []
-comparison_figures = []
+parity_figures = []
 
 for asset, cfg in BREAKDOWN.items():
 
-    segment_configs = [
-        (
-            "Gerçek Kişiler",
-            cfg["individual"],
-            cfg["adjusted_individual"],
-            cfg["parity_individual"],
-        ),
-        (
-            "Tüzel Kişiler",
-            cfg["corporate"],
-            cfg["adjusted_corporate"],
-            cfg["parity_corporate"],
-        ),
-    ]
+    individual_col = cfg["individual"]
+    corporate_col = cfg["corporate"]
 
-    # 1) Mevduat seviyesi grafiği
-    available_level_cols = [
-        col for col in [cfg["individual"], cfg["corporate"]]
+    # Her varlık için seviye grafiği
+    available = [
+        col for col in [individual_col, corporate_col]
         if col in yp_df.columns
     ]
 
-    if available_level_cols:
-        level_long = yp_df[["Tarih"] + available_level_cols].melt(
+    if available:
+        level_long = yp_df[["Tarih"] + available].melt(
             id_vars="Tarih",
             var_name="Seri",
-            value_name="Mevduat Seviyesi",
+            value_name="Tutar",
         )
 
+        # Seri adlarını "USD" gibi aynı etikete çevirmiyoruz.
+        # Böylece gerçek/tüzel ayrımı grafikte kaybolmuyor.
         label_map = {
-            cfg["individual"]: "Gerçek Kişiler",
-            cfg["corporate"]: "Tüzel Kişiler",
+            individual_col: "Gerçek Kişiler",
+            corporate_col: "Tüzel Kişiler",
         }
         level_long["Mevduat Sahibi"] = level_long["Seri"].map(label_map)
 
         fig_level = px.line(
             level_long,
             x="Tarih",
-            y="Mevduat Seviyesi",
+            y="Tutar",
             color="Mevduat Sahibi",
             color_discrete_map=SEGMENT_COLORS,
             title=f"{asset} — Mevduat Seviyesi",
             labels={
                 "Tarih": "Tarih",
-                "Mevduat Seviyesi": "Seri değeri",
+                "Tutar": cfg["unit"],
                 "Mevduat Sahibi": "Mevduat Sahibi",
             },
         )
         fig_level.update_traces(line=dict(width=3))
-        fig_level.update_layout(hovermode="x unified")
+        fig_level.update_layout(
+            hovermode="x unified",
+            legend_title_text="Mevduat Sahibi",
+        )
         level_figures.append((asset, fig_level))
 
-    # 2) Nominal haftalık değişim grafiği
-    nominal_rows = []
+    # Haftalık nominal delta grafiği
+    delta_rows = []
 
-    for segment, level_col, _, _ in segment_configs:
+    for segment, level_col in [
+        ("Gerçek Kişiler", individual_col),
+        ("Tüzel Kişiler", corporate_col),
+    ]:
         if level_col in yp_df.columns:
             temp = yp_df[["Tarih", level_col]].copy()
-            temp["Değişim"] = temp[level_col].diff()
+            temp["Haftalık Nominal Değişim"] = temp[level_col].diff()
             temp["Mevduat Sahibi"] = segment
-            nominal_rows.append(
-                temp[["Tarih", "Değişim", "Mevduat Sahibi"]]
+
+            delta_rows.append(
+                temp[["Tarih", "Haftalık Nominal Değişim", "Mevduat Sahibi"]]
             )
 
-    if nominal_rows:
-        nominal_long = pd.concat(nominal_rows, ignore_index=True)
+    if delta_rows:
+        delta_long_asset = pd.concat(delta_rows, ignore_index=True)
 
         fig_delta = px.bar(
-            nominal_long,
+            delta_long_asset,
             x="Tarih",
-            y="Değişim",
+            y="Haftalık Nominal Değişim",
             color="Mevduat Sahibi",
             color_discrete_map=SEGMENT_COLORS,
             barmode="group",
             title=f"{asset} — Haftalık Nominal Değişim",
             labels={
                 "Tarih": "Tarih",
-                "Değişim": "Seri değerindeki değişim",
+                "Haftalık Nominal Değişim": cfg["unit"],
                 "Mevduat Sahibi": "Mevduat Sahibi",
             },
         )
-        fig_delta.update_layout(hovermode="x unified")
+        fig_delta.update_layout(legend_title_text="Mevduat Sahibi")
         delta_figures.append((asset, fig_delta))
 
-    # 3) Nominal / parite hariç / parite etkisi karşılaştırması
-    comparison_rows = []
-
-    for segment, level_col, adjusted_col, parity_col in segment_configs:
-        nominal = (
-            yp_df[level_col].diff()
-            if level_col in yp_df.columns
-            else pd.Series(index=yp_df.index, dtype="float64")
-        )
-
-        for change_type, series in [
-            ("Nominal Değişim", nominal),
-            (
-                "Parite Hariç Değişim",
-                yp_df[adjusted_col]
-                if adjusted_col in yp_df.columns
-                else pd.Series(index=yp_df.index, dtype="float64"),
-            ),
-            (
-                "Parite Etkisi",
-                yp_df[parity_col]
-                if parity_col in yp_df.columns
-                else pd.Series(index=yp_df.index, dtype="float64"),
-            ),
-        ]:
-            temp = pd.DataFrame({
-                "Tarih": yp_df["Tarih"],
-                "Değişim": series,
-                "Mevduat Sahibi": segment,
-                "Değişim Türü": change_type,
-            })
-            comparison_rows.append(temp)
-
+    # Tablo için son seviye ve haftalık değişim
+    for segment, level_col, adjusted_col, parity_col in [
+        (
+            "Gerçek Kişiler",
+            individual_col,
+            cfg["adjusted_individual"],
+            cfg["parity_individual"],
+        ),
+        (
+            "Tüzel Kişiler",
+            corporate_col,
+            cfg["adjusted_corporate"],
+            cfg["parity_corporate"],
+        ),
+    ]:
         breakdown_rows.append({
             "Döviz / Varlık": asset,
             "Mevduat Sahibi": segment,
             "Mevcut Seviye": latest_value(yp_df, level_col),
-            "Nominal Değişim": latest_difference(yp_df, level_col),
+            "Haftalık Nominal Değişim": latest_difference(yp_df, level_col),
             "Parite Hariç Değişim": latest_value(yp_df, adjusted_col),
             "Parite Etkisi": latest_value(yp_df, parity_col),
         })
 
-    if comparison_rows:
-        comparison_long = pd.concat(comparison_rows, ignore_index=True)
-        comparison_long = comparison_long.dropna(subset=["Değişim"])
+    # Parite hariç değişim ve parite etkisini iki segment için ayrı grafikle
+    parity_rows = []
 
-        if not comparison_long.empty:
-            fig_comparison = px.bar(
-                comparison_long,
-                x="Tarih",
-                y="Değişim",
-                color="Değişim Türü",
-                facet_row="Mevduat Sahibi",
-                barmode="group",
-                title=f"{asset} — Nominal Değişim, Parite Hariç Değişim ve Parite Etkisi",
-                labels={
-                    "Tarih": "Tarih",
-                    "Değişim": "Seri değeri",
-                    "Değişim Türü": "Değişim Türü",
-                },
-            )
-            fig_comparison.update_layout(hovermode="x unified")
-            comparison_figures.append((asset, fig_comparison))
+    for segment, adjusted_col, parity_col in [
+        (
+            "Gerçek Kişiler",
+            cfg["adjusted_individual"],
+            cfg["parity_individual"],
+        ),
+        (
+            "Tüzel Kişiler",
+            cfg["adjusted_corporate"],
+            cfg["parity_corporate"],
+        ),
+    ]:
+        for series_name, col_name in [
+            ("Parite Hariç Değişim", adjusted_col),
+            ("Parite Etkisi", parity_col),
+        ]:
+            if col_name in yp_df.columns:
+                temp = yp_df[["Tarih", col_name]].copy()
+                temp["Değişim Türü"] = series_name
+                temp["Mevduat Sahibi"] = segment
+                temp = temp.rename(columns={col_name: "Değer"})
+                parity_rows.append(temp)
+
+    if parity_rows:
+        parity_long = pd.concat(parity_rows, ignore_index=True)
+
+        fig_parity = px.bar(
+            parity_long,
+            x="Tarih",
+            y="Değer",
+            color="Değişim Türü",
+            facet_row="Mevduat Sahibi",
+            barmode="group",
+            title=f"{asset} — Parite Hariç Değişim ve Parite Etkisi",
+            labels={
+                "Tarih": "Tarih",
+                "Değer": "Seri değeri",
+                "Değişim Türü": "Değişim Türü",
+            },
+        )
+        fig_parity.update_layout(hovermode="x unified")
+        parity_figures.append((asset, fig_parity))
 
 
-# Mevduat seviyesi grafikleri
+# Seviye grafikleri
 st.markdown("#### Mevduat Seviyeleri")
+
 for asset, fig in level_figures:
     st.plotly_chart(fig, use_container_width=True)
 
-# Nominal değişim grafikleri
+# Haftalık nominal delta grafikleri
 st.markdown("#### Haftalık Nominal Değişimler")
+
 for asset, fig in delta_figures:
     st.plotly_chart(fig, use_container_width=True)
 
-# Üç değişim bileşenini birlikte gösteren grafikler
-st.markdown("#### Nominal Değişim / Parite Hariç Değişim / Parite Etkisi")
-for asset, fig in comparison_figures:
-    st.plotly_chart(fig, use_container_width=True)
-
-# Son gözlemin sayısal özeti
+# Son hafta tablosu
 st.markdown("#### Son Haftanın Sayısal Özeti")
+
 breakdown_df = pd.DataFrame(breakdown_rows)
 
 st.dataframe(
@@ -1074,8 +1079,8 @@ st.dataframe(
             "Mevcut Seviye",
             format="%,.2f",
         ),
-        "Nominal Değişim": st.column_config.NumberColumn(
-            "Nominal Değişim",
+        "Haftalık Nominal Değişim": st.column_config.NumberColumn(
+            "Haftalık Nominal Değişim",
             format="%+,.2f",
         ),
         "Parite Hariç Değişim": st.column_config.NumberColumn(
@@ -1090,12 +1095,16 @@ st.dataframe(
 )
 
 st.caption(
-    "Nominal değişim, ilgili mevduat seviyesi serisinin son iki gözlemi "
-    "arasındaki farktır. Parite hariç değişim ve parite etkisi, ilgili "
-    "TCMB EVDS değişim serilerinin son gözleminden alınır. Farklı serilerin "
-    "ölçü birimleri aynı olmayabileceğinden tutarlar kendi seri tanımları "
-    "çerçevesinde değerlendirilmelidir."
+    "Haftalık nominal değişim, ilgili seviyenin son iki gözlemi arasındaki "
+    "farkıdır. Parite hariç değişim ve parite etkisi ilgili EVDS serilerinden "
+    "alınır. Birimlerin doğru yorumlanması için EVDS serisinin açıklamasındaki "
+    "ölçü birimi esas alınmalıdır."
 )
+
+# Parite grafikleri ayrı bölümde
+with st.expander("Parite etkisi ayrıntılı grafikleri"):
+    for asset, fig in parity_figures:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------------------------------------------------------
@@ -1144,22 +1153,13 @@ if st.button("YP DTH Raporunu E-posta ile Gönder"):
                 )
             )
 
-        for asset, fig in comparison_figures:
-            attachments.append(
-                (
-                    f"{asset.lower().replace(' ', '_')}_parite_karsilastirma.png",
-                    fig_to_png(fig),
-                )
-            )
-
         send_email(
             "YP DTH Analiz Raporu",
             (
                 "YP DTH Analiz Dashboard raporu ektedir.\n\n"
                 "Raporda toplam YP mevduat, gerçek kişiler, tüzel kişiler, "
-                "USD/EUR/diğer döviz/altın seviyeleri ile gerçek ve tüzel kişiler için "
-                "nominal değişim, parite hariç değişim ve parite etkisi "
-                "karşılaştırmaları yer almaktadır."
+                "USD/EUR/diğer döviz/altın seviyeleri ve haftalık nominal "
+                "değişimler yer almaktadır."
             ),
             attachments,
         )
@@ -1172,4 +1172,3 @@ if st.button("YP DTH Raporunu E-posta ile Gönder"):
             "için Kaleido kurulumu gerekebilir. Hata: "
             f"{e}"
         )
-
