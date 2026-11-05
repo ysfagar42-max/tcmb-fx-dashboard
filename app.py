@@ -3,6 +3,9 @@ import requests
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import io
 
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
