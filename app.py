@@ -341,6 +341,62 @@ def format_value(value, decimals=2):
     return f"{value:+,.{decimals}f}"
 
 
+def add_line_end_labels(fig, decimals=2):
+    """Çizgi grafiklerinin son geçerli gözlem değerini çizginin sağına yazar."""
+    annotations = []
+
+    for trace in fig.data:
+        if trace.type != "scatter" or trace.mode is None or "lines" not in trace.mode:
+            continue
+
+        points = [
+            (x, y)
+            for x, y in zip(trace.x, trace.y)
+            if pd.notna(x) and pd.notna(y)
+        ]
+
+        if not points:
+            continue
+
+        last_x, last_y = points[-1]
+        trace_color = getattr(trace.line, "color", None) or "#374151"
+
+        annotations.append(
+            dict(
+                x=last_x,
+                y=last_y,
+                xref="x",
+                yref="y",
+                text=f"{last_y:,.{decimals}f}",
+                showarrow=False,
+                xanchor="left",
+                yanchor="middle",
+                xshift=9,
+                font=dict(
+                    size=12,
+                    color=trace_color,
+                ),
+                bgcolor="rgba(255,255,255,0.88)",
+                bordercolor=trace_color,
+                borderwidth=1,
+                borderpad=3,
+            )
+        )
+
+    if annotations:
+        fig.update_layout(
+            annotations=list(fig.layout.annotations or ()) + annotations,
+            margin=dict(
+                l=60,
+                r=105,
+                t=75,
+                b=55,
+            ),
+        )
+
+    return fig
+
+
 def fig_to_png(fig):
     return fig.to_image(
         format="png",
@@ -1026,6 +1082,9 @@ for asset, cfg in BREAKDOWN.items():
         )
         fig_level.update_traces(line=dict(width=3))
         fig_level.update_layout(hovermode="x unified")
+        # Son veri noktalarının değerlerini grafiğin sağ ucunda göster.
+        # Bu etiketler PNG/PDF çıktısına ve e-posta eklerine de yansır.
+        add_line_end_labels(fig_level)
         level_figures.append((asset, fig_level))
 
     # 2) Nominal haftalık değişim grafiği
