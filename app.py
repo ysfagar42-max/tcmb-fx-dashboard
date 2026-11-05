@@ -18,8 +18,51 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Mevduat Analiz Dashboard")
-st.caption("TCMB EVDS verileriyle mevduat analizi")
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2.2rem;
+        padding-bottom: 3rem;
+        max-width: 1500px;
+    }
+    h1 {
+        letter-spacing: -0.035em;
+        font-weight: 750 !important;
+    }
+    h2, h3 {
+        letter-spacing: -0.02em;
+        font-weight: 650 !important;
+    }
+    div[data-testid="stMetric"] {
+        background: rgba(128, 128, 128, 0.055);
+        border: 1px solid rgba(128, 128, 128, 0.18);
+        border-radius: 14px;
+        padding: 14px 16px;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-weight: 600;
+    }
+    div[data-testid="stPlotlyChart"] {
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        border-radius: 14px;
+        padding: 8px 8px 2px 8px;
+    }
+    div[data-testid="stDataFrame"] {
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("Mevduat Piyasası | Analiz Paneli")
+st.caption(
+    "TCMB EVDS verileriyle TL ve yabancı para mevduatlarının "
+    "seviyesini, haftalık hareketlerini ve değişim bileşenlerini takip edin."
+)
 
 
 # =========================================================
@@ -364,8 +407,8 @@ def show_date_filters(key_prefix):
 # =========================================================
 
 panel = st.radio(
-    "Analiz paneli",
-    ["YP DTH", "TL Mevduat"],
+    "Analiz alanı",
+    ["YP Mevduat", "TL Mevduat"],
     horizontal=True,
 )
 
@@ -376,7 +419,8 @@ panel = st.radio(
 
 if panel == "TL Mevduat":
 
-    st.header("TL Mevduat Analizi")
+    st.header("TL Mevduat")
+    st.caption("TL mevduat stokunun gelişimi, müşteri grupları ve vade kompozisyonu.")
     start_date, end_date = show_date_filters("tl")
 
     with st.spinner("TL mevduat verileri getiriliyor..."):
@@ -427,7 +471,7 @@ if panel == "TL Mevduat":
 
     latest_tl = tl_df.iloc[-1]
 
-    st.subheader("Genel Görünüm")
+    st.subheader("Öne Çıkan Göstergeler")
     c1, c2, c3, c4 = st.columns(4)
 
     c1.metric(
@@ -460,7 +504,7 @@ if panel == "TL Mevduat":
     )
 
     st.caption(
-        "Seviyeler trilyon TL, değişim tutarları milyar TL olarak gösterilir."
+        "Mevduat stokları trilyon TL, değişim tutarları milyar TL cinsindendir."
     )
 
     fig_total = px.line(
@@ -547,7 +591,7 @@ if panel == "TL Mevduat":
     fig_weekly.update_yaxes(title_text="Milyar TL")
     st.plotly_chart(fig_weekly, use_container_width=True)
 
-    st.subheader("Haftalık Değişim Tablosu")
+    st.subheader("Haftalık Görünüm")
 
     weekly_table = tl_df[
         ["Tarih", total_col, "Haftalık Değişim", "Haftalık Değişim (%)"]
@@ -562,7 +606,7 @@ if panel == "TL Mevduat":
         hide_index=True,
     )
 
-    st.subheader("4 Haftalık Değişim Tablosu")
+    st.subheader("Son 4 Haftalık Değişim")
 
     four_table = tl_df[
         ["Tarih", total_col, "4 Haftalık Değişim", "4 Haftalık Değişim (%)"]
@@ -577,7 +621,7 @@ if panel == "TL Mevduat":
         hide_index=True,
     )
 
-    st.subheader("13 Haftalık Değişim Tablosu")
+    st.subheader("Son 13 Haftalık Değişim")
 
     thirteen_table = tl_df[
         ["Tarih", total_col, "13 Haftalık Değişim", "13 Haftalık Değişim (%)"]
@@ -592,7 +636,7 @@ if panel == "TL Mevduat":
         hide_index=True,
     )
 
-    st.subheader("Veri İndirme")
+    st.subheader("Veriyi Dışa Aktar")
 
     csv_df = tl_df.copy()
     csv_rename = {
@@ -608,15 +652,15 @@ if panel == "TL Mevduat":
     csv_df = csv_df.rename(columns=csv_rename)
 
     st.download_button(
-        "TL Mevduat CSV İndir",
+        "TL Mevduat Verisini İndir (CSV)",
         data=csv_df.to_csv(index=False).encode("utf-8-sig"),
         file_name="tl_mevduat_analiz.csv",
         mime="text/csv",
     )
 
-    st.subheader("Rapor Gönderimi")
+    st.subheader("E-posta Raporu")
 
-    if st.button("TL Mevduat Raporunu E-posta ile Gönder"):
+    if st.button("TL Mevduat Raporunu Gönder"):
         try:
             attachments = [
                 ("toplam_tl_mevduat.png", fig_to_png(fig_total)),
@@ -634,8 +678,8 @@ if panel == "TL Mevduat":
                 )
 
             send_email(
-                "TL Mevduat Analiz Raporu",
-                "TL Mevduat Analiz Dashboard raporu ektedir.",
+                "TL Mevduat | Haftalık Analiz",
+                "TL mevduat analiz raporunuz ekte yer almaktadır.",
                 attachments,
             )
             st.success("E-posta başarıyla gönderildi.")
@@ -650,7 +694,8 @@ if panel == "TL Mevduat":
 # YP DTH PANELİ
 # =========================================================
 
-st.header("YP DTH Analizi")
+st.header("Yabancı Para Mevduatları")
+st.caption("Yurt içi yerleşiklerin yabancı para mevduatlarını müşteri grubu ve varlık türüne göre inceleyin.")
 start_date, end_date = show_date_filters("yp")
 
 all_yp_series = {
@@ -773,7 +818,7 @@ for col, series_name, color in card_data:
 # ---------------------------------------------------------
 
 st.subheader(
-    f"Parite Hariç Mevduat Değişimleri — "
+    f"Parite Etkisinden Arındırılmış Değişim — "
     f"{yp_latest['Tarih'].strftime('%d.%m.%Y')}"
 )
 
@@ -798,15 +843,15 @@ for col, (label, series_name) in zip(
         )
 
 st.caption(
-    "Parite hariç değişimler, TCMB EVDS TP.HPBITABLO5 serilerinin "
-    "son gözlem değerleridir."
+    "Bu göstergeler, ilgili müşteri grubunun mevduatındaki değişimi parite hareketlerinden arındırılmış "
+    "olarak gösterir. Değerler TCMB EVDS’nin son yayımlanan haftalık gözlemine aittir."
 )
 
 # ---------------------------------------------------------
 # ANA GRAFİK: TOPLAM / GERÇEK / TÜZEL
 # ---------------------------------------------------------
 
-st.subheader("Toplam YP Mevduat, Gerçek Kişiler ve Tüzel Kişiler")
+st.subheader("Toplam YP Mevduatın Gelişimi")
 
 main_columns = [
     "Toplam YP Mevduat",
@@ -846,7 +891,7 @@ st.plotly_chart(fig_yp, use_container_width=True)
 # ANA GRUPLARIN HAFTALIK NOMİNAL DEĞİŞİMİ
 # ---------------------------------------------------------
 
-st.subheader("Toplam, Gerçek ve Tüzel Kişiler — Haftalık Nominal Değişim")
+st.subheader("Müşteri Gruplarına Göre Haftalık Değişim")
 
 delta_df = yp_df[["Tarih"] + main_columns].copy()
 
@@ -882,7 +927,7 @@ st.plotly_chart(fig_main_delta, use_container_width=True)
 # USD / EUR / DİĞER DÖVİZ / ALTIN KIRILIMLARI
 # ---------------------------------------------------------
 
-st.subheader("USD, EUR, Diğer Döviz ve Altın Kırılımı")
+st.subheader("Varlık Türüne Göre Mevduat Dağılımı")
 
 st.caption(
     "Nominal değişim, mevduat seviyesinin son iki haftalık gözlemi arasındaki "
@@ -1136,7 +1181,7 @@ st.caption(
 # VERİ TABLOSU VE CSV
 # ---------------------------------------------------------
 
-st.subheader("YP Mevduat Verileri")
+st.subheader("Detaylı Veri Tablosu")
 
 st.dataframe(
     yp_df.sort_values("Tarih", ascending=False),
@@ -1145,7 +1190,7 @@ st.dataframe(
 )
 
 st.download_button(
-    "YP DTH CSV İndir",
+    "YP Mevduat Verisini İndir (CSV)",
     data=yp_df.to_csv(index=False).encode("utf-8-sig"),
     file_name="yp_dth_analiz.csv",
     mime="text/csv",
@@ -1156,9 +1201,9 @@ st.download_button(
 # E-POSTA RAPORU
 # ---------------------------------------------------------
 
-st.subheader("Rapor Gönderimi")
+st.subheader("E-posta Raporu")
 
-if st.button("YP DTH Raporunu E-posta ile Gönder"):
+if st.button("YP Mevduat Raporunu Gönder"):
     try:
         attachments = [
             ("yp_toplam_gercek_tuzel.png", fig_to_png(fig_yp)),
@@ -1187,9 +1232,9 @@ if st.button("YP DTH Raporunu E-posta ile Gönder"):
             )
 
         send_email(
-            "YP DTH Analiz Raporu",
+            "YP Mevduat | Haftalık Analiz",
             (
-                "YP DTH Analiz Dashboard raporu ektedir.\n\n"
+                "Yabancı para mevduat analiz raporunuz ekte yer almaktadır.\n\n"
                 "Raporda toplam YP mevduat, gerçek kişiler, tüzel kişiler, "
                 "USD/EUR/diğer döviz/altın seviyeleri ile gerçek ve tüzel kişiler için "
                 "nominal değişim, parite hariç değişim ve parite etkisi "
