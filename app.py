@@ -769,6 +769,40 @@ for col, series_name, color in card_data:
         )
 
 # ---------------------------------------------------------
+# PARİTE HARİÇ MEVDUAT DEĞİŞİMLERİ — SAYFANIN ÜST BÖLÜMÜ
+# ---------------------------------------------------------
+
+st.subheader(
+    f"Parite Hariç Mevduat Değişimleri — "
+    f"{yp_latest['Tarih'].strftime('%d.%m.%Y')}"
+)
+
+parity_excluded_cards = [
+    ("Yurt İçi Yerleşikler", "Parite Hariç - Yurt İçi Yerleşikler"),
+    ("Gerçek Kişiler", "Parite Hariç - Gerçek Kişiler"),
+    ("Tüzel Kişiler", "Parite Hariç - Tüzel Kişiler"),
+]
+
+pc1, pc2, pc3 = st.columns(3)
+
+for col, (label, series_name) in zip(
+    [pc1, pc2, pc3],
+    parity_excluded_cards,
+):
+    value = latest_value(yp_df, series_name)
+
+    with col:
+        col.metric(
+            label=f"{label} — Parite Hariç",
+            value=f"{value:+,.2f}" if pd.notna(value) else "Veri yok",
+        )
+
+st.caption(
+    "Parite hariç değişimler, TCMB EVDS TP.HPBITABLO5 serilerinin "
+    "son gözlem değerleridir."
+)
+
+# ---------------------------------------------------------
 # ANA GRAFİK: TOPLAM / GERÇEK / TÜZEL
 # ---------------------------------------------------------
 
