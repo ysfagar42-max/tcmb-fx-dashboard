@@ -398,13 +398,123 @@ def add_line_end_labels(fig, decimals=2):
 
 
 def fig_to_png(fig):
-    return fig.to_image(
+    """
+    Plotly grafiğini Kaleido kullanmadan Matplotlib ile PNG'ye çevirir.
+    """
+
+    mpl_fig, ax = plt.subplots(figsize=(14, 7))
+
+    has_data = False
+
+    for trace in fig.data:
+
+        x = list(trace.x) if trace.x is not None else []
+        y = list(trace.y) if trace.y is not None else []
+
+        if not x or not y:
+            continue
+
+        color = None
+
+        if trace.type == "bar":
+
+            ax.bar(
+                x,
+                y,
+                label=trace.name or "Seri",
+                alpha=0.8,
+            )
+
+            has_data = True
+
+        elif trace.type == "scatter":
+
+            mode = trace.mode or "lines"
+
+            if "lines" in mode:
+                ax.plot(
+                    x,
+                    y,
+                    label=trace.name or "Seri",
+                    linewidth=2,
+                )
+
+                valid_points = [
+                    (xv, yv)
+                    for xv, yv in zip(x, y)
+                    if pd.notna(xv) and pd.notna(yv)
+                ]
+
+                if valid_points:
+                    last_x, last_y = valid_points[-1]
+
+                    ax.annotate(
+                        f"{last_y:,.2f}",
+                        xy=(last_x, last_y),
+                        xytext=(8, 0),
+                        textcoords="offset points",
+                        fontsize=9,
+                    )
+
+                has_data = True
+
+            elif "markers" in mode:
+                ax.scatter(
+                    x,
+                    y,
+                    label=trace.name or "Seri",
+                )
+
+                has_data = True
+
+    title = ""
+
+    if fig.layout.title and fig.layout.title.text:
+        title = fig.layout.title.text
+
+    x_title = ""
+    y_title = ""
+
+    if fig.layout.xaxis and fig.layout.xaxis.title:
+        x_title = fig.layout.xaxis.title.text or ""
+
+    if fig.layout.yaxis and fig.layout.yaxis.title:
+        y_title = fig.layout.yaxis.title.text or ""
+
+    ax.set_title(title, fontsize=15, fontweight="bold", pad=18)
+    ax.set_xlabel(x_title)
+    ax.set_ylabel(y_title)
+
+    ax.grid(True, alpha=0.25)
+
+    if has_data:
+        ax.legend(loc="best", fontsize=9)
+
+    # Tarih eksenini okunabilir hale getir.
+    try:
+        ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%d.%m.%Y")
+        )
+        mpl_fig.autofmt_xdate()
+    except Exception:
+        pass
+
+    mpl_fig.tight_layout()
+
+    buffer = io.BytesIO()
+
+    mpl_fig.savefig(
+        buffer,
         format="png",
-        width=1400,
-        height=700,
-        scale=2,
+        dpi=180,
+        bbox_inches="tight",
     )
 
+    plt.close(mpl_fig)
+
+    buffer.seek(0)
+
+    return buffer.getvalue()
 
 def send_email(subject, body, attachments):
     message = EmailMessage()
