@@ -627,278 +627,234 @@ panel = st.radio(
 # TL MEVDUAT PANELİ
 # =========================================================
 
+
 if panel == "TL Mevduat":
+    import plotly.graph_objects as go
 
     st.header("TL Mevduat")
-    st.caption("TL mevduat stokunun gelişimi, müşteri grupları ve vade kompozisyonu.")
+    st.caption("Mevduat stoku, müşteri grupları ve vadeli/vadesiz kompozisyonu.")
+    st.info("📅 **Analiz tarihlerini değiştirebilirsiniz.** Aşağıdaki başlangıç ve bitiş tarihlerini seçerek grafikleri ve tabloları istediğiniz dönem için güncelleyebilirsiniz.")
     start_date, end_date = show_date_filters("tl")
 
     with st.spinner("TL mevduat verileri getiriliyor..."):
         try:
             tl_df, tl_fetched_at = fetch_evds_data(
-                start_date,
-                end_date,
-                tuple(TL_SERIES.items()),
+                start_date, end_date, tuple(TL_SERIES.items())
             )
         except Exception as e:
             st.error(f"TL verileri alınamadı: {e}")
             st.stop()
 
     show_data_status(tl_df, tl_fetched_at)
-
-    available_tl_columns = [
-        name for name in TL_SERIES if name in tl_df.columns
-    ]
-
-    if tl_df.empty or "Toplam TL Mevduat" not in available_tl_columns:
+    if tl_df.empty or "Toplam TL Mevduat" not in tl_df.columns:
         st.error("Toplam TL Mevduat serisi bulunamadı.")
         st.stop()
 
-    # Milyon TL -> trilyon TL
-    tl_df[available_tl_columns] = (
-        tl_df[available_tl_columns] / 1_000_000
-    )
-
+    # EVDS kaynak serileri milyon TL: stokları trilyon, değişimleri milyar TL gösteriyoruz.
+    tl_cols = [c for c in TL_SERIES if c in tl_df.columns]
+    tl_df[tl_cols] = tl_df[tl_cols].apply(pd.to_numeric, errors="coerce") / 1_000_000
+    tl_df = tl_df.sort_values("Tarih").reset_index(drop=True)
     total_col = "Toplam TL Mevduat"
-
-    # Seviye: trilyon TL; değişim: milyar TL
     tl_df["Haftalık Değişim"] = tl_df[total_col].diff() * 1000
-    tl_df["Haftalık Değişim (%)"] = tl_df[total_col].pct_change() * 100
+    tl_df["Haftalık Değişim (%)"] = tl_df[total_col].pct_change(fill_method=None) * 100
+    for n, label in [(4, "4 Haftalık"), (13, "13 Haftalık")]:
+        tl_df[f"{label} Değişim"] = (tl_df[total_col] - tl_df[total_col].shift(n)) * 1000
+        tl_df[f"{label} Değişim (%)"] = tl_df[total_col].pct_change(n, fill_method=None) * 100
 
-    tl_df["4 Haftalık Değişim"] = (
-        tl_df[total_col] - tl_df[total_col].shift(4)
-    ) * 1000
-    tl_df["4 Haftalık Değişim (%)"] = (
-        tl_df[total_col].pct_change(4) * 100
-    )
+    def tl_number(value, decimals=2, signed=False):
+        if pd.isna(value):
+            return "—"
+        return f"{value:{'+' if signed else ''},.{decimals}f}"
 
-    tl_df["13 Haftalık Değişim"] = (
-        tl_df[total_col] - tl_df[total_col].shift(13)
-    ) * 1000
-    tl_df["13 Haftalık Değişim (%)"] = (
-        tl_df[total_col].pct_change(13) * 100
-    )
+    def tl_plot(title, columns, unit="Trilyon TL", change=False):
+        fig = go.Figure()
+        palette = ["#2563eb", "#0f766e", "#ea580c", "#9333ea", "#64748b"]
+        annotations = []
+        for i, name in enumerate(columns):
+            if name not in tl_df.columns:
+                continue
+            subset = tl_df[["Tarih", name]].dropna()
+            if subset.empty:
+                continue
+            values = subset[name]
+            color = palette[i % len(palette)]
+            fig.add_trace(go.Scatter(
+                x=subset["Tarih"], y=values, name=name, mode="lines",
+                line=dict(color=color, width=2.7)
+            ))
+            annotations.append((subset["Tarih"].iloc[-1], values.iloc[-1], color))
+        for x, y, color in annotations:
+            fig.add_annotation(
+                x=x, y=y, xref="x", yref="y",
+                text=tl_number(y, 2 if not change else 1, signed=change),
+                showarrow=False, xanchor="left", xshift=12,
+                font=dict(size=11, color=color),
+                bgcolor="rgba(255,255,255,.95)",
+                bordercolor=color, borderwidth=1
+            )
+        fig.update_layout(
+            title=None, template="plotly_white", height=430,
+            margin=dict(l=65, r=160, t=75, b=65),
+            legend=dict(orientation="h", y=1.15, yanchor="bottom",
+                        x=0, xanchor="left", title_text=""),
+            hovermode="x unified",
+            xaxis_title="Tarih", yaxis_title=unit,
+            font=dict(size=12)
+        )
+        fig.update_xaxes(tickformat="%d.%m.%y", showgrid=False)
+        fig.update_yaxes(tickformat=",.2f", separatethousands=True)
+        return fig
 
-    latest_tl = tl_df.iloc[-1]
+    def tl_change_table(columns):
+        records = []
+        for name in columns:
+            if name not in tl_df.columns:
+                continue
+            valid = tl_df[name].dropna()
+            if valid.empty:
+                continue
+            last = valid.iloc[-1]
+            weekly = (valid.iloc[-1] - valid.iloc[-2]) * 1000 if len(valid) > 1 else float("nan")
+            records.append({
+                "Mevduat Türü": name,
+                "Güncel Stok (Trilyon TL)": tl_number(last),
+                "Haftalık Değişim (Milyar TL)": tl_number(weekly, 1, signed=True),
+            })
+        return pd.DataFrame(records)
 
-    st.subheader("Öne Çıkan Göstergeler")
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric(
-        "Toplam TL Mevduat",
-        f"{latest_tl[total_col]:,.2f} trilyon TL",
-    )
-
+    latest = tl_df.iloc[-1]
+    st.subheader("TL Mevduat Görünümü")
+    a, b, c, d = st.columns(4)
+    a.metric("Toplam TL Mevduat", f"{tl_number(latest[total_col])} trilyon TL")
     resident = latest_value(tl_df, "Yurt İçi Yerleşikler")
-    c2.metric(
-        "Yurt İçi Yerleşikler",
-        f"{resident:,.2f} trilyon TL" if pd.notna(resident) else "Veri yok",
-    )
+    b.metric("Yurt İçi Yerleşikler", f"{tl_number(resident)} trilyon TL" if pd.notna(resident) else "Veri yok")
+    w, wp = latest["Haftalık Değişim"], latest["Haftalık Değişim (%)"]
+    a4, p4 = latest["4 Haftalık Değişim"], latest["4 Haftalık Değişim (%)"]
+    c.metric("Haftalık Değişim", f"{tl_number(w, 1, True)} milyar TL",
+             f"{tl_number(wp, 2, True)}%" if pd.notna(wp) else None)
+    d.metric("4 Haftalık Değişim", f"{tl_number(a4, 1, True)} milyar TL",
+             f"{tl_number(p4, 2, True)}%" if pd.notna(p4) else None)
+    st.caption("Stoklar **trilyon TL**, haftalık ve dönemsel değişimler **milyar TL** cinsindedir.")
 
-    weekly = latest_tl["Haftalık Değişim"]
-    weekly_pct = latest_tl["Haftalık Değişim (%)"]
-
-    c3.metric(
-        "Haftalık Değişim",
-        f"{weekly:+,.1f} milyar TL" if pd.notna(weekly) else "Veri yok",
-        f"{weekly_pct:+.2f}%" if pd.notna(weekly_pct) else None,
-    )
-
-    four_week = latest_tl["4 Haftalık Değişim"]
-    four_pct = latest_tl["4 Haftalık Değişim (%)"]
-
-    c4.metric(
-        "4 Haftalık Değişim",
-        f"{four_week:+,.1f} milyar TL" if pd.notna(four_week) else "Veri yok",
-        f"{four_pct:+.2f}%" if pd.notna(four_pct) else None,
-    )
-
-    st.caption(
-        "Mevduat stokları trilyon TL, değişim tutarları milyar TL cinsindendir."
-    )
-
-    fig_total = px.line(
-        tl_df,
-        x="Tarih",
-        y=total_col,
-        title="Toplam TL Mevduat",
-        labels={"Tarih": "Tarih", total_col: "Trilyon TL"},
-    )
-    fig_total.update_yaxes(title_text="Trilyon TL")
-    fig_total.update_layout(hovermode="x unified")
+    st.subheader("Toplam TL Mevduat")
+    fig_total = tl_plot("Toplam TL Mevduat", [total_col])
     st.plotly_chart(fig_total, use_container_width=True)
 
+    st.subheader("Toplam TL Mevduatta Haftalık Değişim")
+    fig_weekly = go.Figure()
+    weekly_valid = tl_df[["Tarih", "Haftalık Değişim"]].dropna()
+    fig_weekly.add_trace(go.Bar(
+        x=weekly_valid["Tarih"], y=weekly_valid["Haftalık Değişim"],
+        name="Haftalık Değişim",
+        marker_color=["#15803d" if v >= 0 else "#dc2626"
+                      for v in weekly_valid["Haftalık Değişim"]]
+    ))
+    if not weekly_valid.empty:
+        lx, ly = weekly_valid.iloc[-1][["Tarih", "Haftalık Değişim"]]
+        fig_weekly.add_annotation(
+            x=lx, y=ly, text=f"{tl_number(ly, 1, True)} milyar TL",
+            showarrow=True, arrowhead=2, ay=-35 if ly >= 0 else 35,
+            font=dict(color="#15803d" if ly >= 0 else "#dc2626", size=12),
+            bgcolor="white"
+        )
+    fig_weekly.update_layout(
+        template="plotly_white", height=410, showlegend=False,
+        margin=dict(l=65, r=90, t=35, b=65),
+        xaxis_title="Tarih", yaxis_title="Milyar TL",
+        hovermode="x unified"
+    )
+    fig_weekly.update_xaxes(tickformat="%d.%m.%y", showgrid=False)
+    st.plotly_chart(fig_weekly, use_container_width=True)
+
     person_columns = [
-        "Gerçek Kişiler",
-        "Ticari Kuruluşlar",
-        "Resmî Kuruluşlar",
-        "Kâr Amacı Olmayan Kuruluşlar",
-        "Banka Dışı Finansal Kuruluşlar",
+        "Gerçek Kişiler", "Ticari Kuruluşlar", "Resmî Kuruluşlar",
+        "Kâr Amacı Olmayan Kuruluşlar", "Banka Dışı Finansal Kuruluşlar"
     ]
     person_columns = [c for c in person_columns if c in tl_df.columns]
     fig_person = None
-
     if person_columns:
-        person_long = tl_df[["Tarih"] + person_columns].melt(
-            id_vars="Tarih",
-            var_name="Mevduat Türü",
-            value_name="Tutar",
-        )
-
-        fig_person = px.line(
-            person_long,
-            x="Tarih",
-            y="Tutar",
-            color="Mevduat Türü",
-            title="Mevduat Türlerine Göre Gelişim",
-            labels={"Tarih": "Tarih", "Tutar": "Trilyon TL"},
-        )
-        fig_person.update_yaxes(title_text="Trilyon TL")
-        fig_person.update_layout(hovermode="x unified")
+        st.subheader("Mevduat Türlerine Göre Gelişim")
+        st.caption("Grafikteki son değerler güncel stokları; tablodaki +/− işaretleri haftalık değişimin yönünü gösterir.")
+        fig_person = tl_plot("Mevduat Türlerine Göre Gelişim", person_columns)
         st.plotly_chart(fig_person, use_container_width=True)
+        st.dataframe(tl_change_table(person_columns), use_container_width=True, hide_index=True)
 
-    maturity_columns = [
-        "Gerçek Kişiler - Vadesiz",
-        "Gerçek Kişiler - Vadeli",
-        "Ticari Kuruluşlar - Vadesiz",
-        "Ticari Kuruluşlar - Vadeli",
-        "Resmî Kuruluşlar - Vadesiz",
-        "Resmî Kuruluşlar - Vadeli",
-        "Kâr Amacı Olmayan Kuruluşlar - Vadesiz",
-        "Kâr Amacı Olmayan Kuruluşlar - Vadeli",
-        "Banka Dışı Finansal Kuruluşlar - Vadesiz",
-        "Banka Dışı Finansal Kuruluşlar - Vadeli",
-    ]
-    maturity_columns = [c for c in maturity_columns if c in tl_df.columns]
+    maturity_groups = {
+        "Gerçek Kişiler": ["Gerçek Kişiler - Vadeli", "Gerçek Kişiler - Vadesiz"],
+        "Ticari Kuruluşlar": ["Ticari Kuruluşlar - Vadeli", "Ticari Kuruluşlar - Vadesiz"],
+        "Resmî Kuruluşlar": ["Resmî Kuruluşlar - Vadeli", "Resmî Kuruluşlar - Vadesiz"],
+        "Kâr Amacı Olmayan Kuruluşlar": [
+            "Kâr Amacı Olmayan Kuruluşlar - Vadeli",
+            "Kâr Amacı Olmayan Kuruluşlar - Vadesiz"
+        ],
+        "Banka Dışı Finansal Kuruluşlar": [
+            "Banka Dışı Finansal Kuruluşlar - Vadeli",
+            "Banka Dışı Finansal Kuruluşlar - Vadesiz"
+        ],
+    }
+    st.subheader("Vadeli / Vadesiz Mevduat")
+    st.caption("Grafiklerin üst üste binmesini önlemek için müşteri gruplarını ayrı ayrı inceleyebilirsiniz.")
+    group = st.selectbox("Müşteri grubu", list(maturity_groups), key="tl_maturity_group")
+    maturity_columns = [c for c in maturity_groups[group] if c in tl_df.columns]
     fig_maturity = None
-
     if maturity_columns:
-        maturity_long = tl_df[["Tarih"] + maturity_columns].melt(
-            id_vars="Tarih",
-            var_name="Mevduat Türü",
-            value_name="Tutar",
-        )
-
-        fig_maturity = px.line(
-            maturity_long,
-            x="Tarih",
-            y="Tutar",
-            color="Mevduat Türü",
-            title="Vadeli / Vadesiz Mevduat",
-            labels={"Tarih": "Tarih", "Tutar": "Trilyon TL"},
-        )
-        fig_maturity.update_yaxes(title_text="Trilyon TL")
-        fig_maturity.update_layout(hovermode="x unified")
+        fig_maturity = tl_plot("Vadeli / Vadesiz Mevduat", maturity_columns)
         st.plotly_chart(fig_maturity, use_container_width=True)
+        st.dataframe(tl_change_table(maturity_columns), use_container_width=True, hide_index=True)
+    else:
+        st.warning("Seçilen müşteri grubu için vade kırılımı bulunamadı.")
 
-    fig_weekly = px.bar(
-        tl_df,
-        x="Tarih",
-        y="Haftalık Değişim",
-        title="Toplam TL Mevduatta Haftalık Değişim",
-        labels={"Tarih": "Tarih", "Haftalık Değişim": "Milyar TL"},
-    )
-    fig_weekly.update_yaxes(title_text="Milyar TL")
-    st.plotly_chart(fig_weekly, use_container_width=True)
-
-    st.subheader("Haftalık Görünüm")
-
-    weekly_table = tl_df[
-        ["Tarih", total_col, "Haftalık Değişim", "Haftalık Değişim (%)"]
-    ].copy().rename(columns={
-        total_col: "Toplam TL Mevduat (Trilyon TL)",
-        "Haftalık Değişim": "Haftalık Değişim (Milyar TL)",
-    })
-
-    st.dataframe(
-        weekly_table.sort_values("Tarih", ascending=False),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.subheader("Son 4 Haftalık Değişim")
-
-    four_table = tl_df[
-        ["Tarih", total_col, "4 Haftalık Değişim", "4 Haftalık Değişim (%)"]
-    ].copy().rename(columns={
-        total_col: "Toplam TL Mevduat (Trilyon TL)",
-        "4 Haftalık Değişim": "4 Haftalık Değişim (Milyar TL)",
-    })
-
-    st.dataframe(
-        four_table.sort_values("Tarih", ascending=False),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.subheader("Son 13 Haftalık Değişim")
-
-    thirteen_table = tl_df[
-        ["Tarih", total_col, "13 Haftalık Değişim", "13 Haftalık Değişim (%)"]
-    ].copy().rename(columns={
-        total_col: "Toplam TL Mevduat (Trilyon TL)",
-        "13 Haftalık Değişim": "13 Haftalık Değişim (Milyar TL)",
-    })
-
-    st.dataframe(
-        thirteen_table.sort_values("Tarih", ascending=False),
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.subheader("Dönemsel Değişimler")
+    tab_week, tab_four, tab_thirteen = st.tabs(["Haftalık", "Son 4 Hafta", "Son 13 Hafta"])
+    for tab, period in [
+        (tab_week, "Haftalık"), (tab_four, "4 Haftalık"), (tab_thirteen, "13 Haftalık")
+    ]:
+        with tab:
+            columns = ["Tarih", total_col, f"{period} Değişim", f"{period} Değişim (%)"]
+            view = tl_df[columns].copy().sort_values("Tarih", ascending=False)
+            view = view.rename(columns={
+                total_col: "Stok (Trilyon TL)",
+                f"{period} Değişim": "Değişim (Milyar TL)",
+                f"{period} Değişim (%)": "Değişim (%)"
+            })
+            view["Stok (Trilyon TL)"] = view["Stok (Trilyon TL)"].map(lambda x: tl_number(x, 2))
+            view["Değişim (Milyar TL)"] = view["Değişim (Milyar TL)"].map(lambda x: tl_number(x, 1, True))
+            view["Değişim (%)"] = view["Değişim (%)"].map(lambda x: tl_number(x, 2, True))
+            st.dataframe(view, use_container_width=True, hide_index=True)
 
     st.subheader("Veriyi Dışa Aktar")
-
-    csv_df = tl_df.copy()
-    csv_rename = {
-        name: f"{name} (Trilyon TL)"
-        for name in TL_SERIES
-        if name in csv_df.columns
-    }
-    csv_rename.update({
+    csv_df = tl_df.rename(columns={
+        **{c: f"{c} (Trilyon TL)" for c in tl_cols},
         "Haftalık Değişim": "Haftalık Değişim (Milyar TL)",
         "4 Haftalık Değişim": "4 Haftalık Değişim (Milyar TL)",
-        "13 Haftalık Değişim": "13 Haftalık Değişim (Milyar TL)",
+        "13 Haftalık Değişim": "13 Haftalık Değişim (Milyar TL)"
     })
-    csv_df = csv_df.rename(columns=csv_rename)
-
     st.download_button(
         "TL Mevduat Verisini İndir (CSV)",
         data=csv_df.to_csv(index=False).encode("utf-8-sig"),
-        file_name="tl_mevduat_analiz.csv",
-        mime="text/csv",
+        file_name="tl_mevduat_analiz.csv", mime="text/csv"
     )
 
     st.subheader("E-posta Raporu")
-
-    if st.button("TL Mevduat Raporunu Gönder"):
+    if st.button("E-posta Gönder", key="tl_send_email"):
         try:
             attachments = [
                 ("toplam_tl_mevduat.png", fig_to_png(fig_total)),
                 ("haftalik_degisim.png", fig_to_png(fig_weekly)),
             ]
-
             if fig_person is not None:
-                attachments.append(
-                    ("mevduat_turleri.png", fig_to_png(fig_person))
-                )
-
+                attachments.append(("mevduat_turleri.png", fig_to_png(fig_person)))
             if fig_maturity is not None:
-                attachments.append(
-                    ("vadeli_vadesiz.png", fig_to_png(fig_maturity))
-                )
-
+                attachments.append(("vadeli_vadesiz.png", fig_to_png(fig_maturity)))
             send_email(
                 "TL Mevduat | Haftalık Analiz",
-                "TL mevduat analiz raporunuz ekte yer almaktadır.",
-                attachments,
+                "Merhaba,\n\nTL mevduat analiz grafikleri ekte yer almaktadır.\n\nSaygılarımla,",
+                attachments
             )
             st.success("E-posta başarıyla gönderildi.")
-
         except Exception as e:
             st.error(f"E-posta gönderilemedi: {e}")
-
     st.stop()
-
 
 # =========================================================
 # YP MEVDUAT PANELİ — YENİ TASARIM
