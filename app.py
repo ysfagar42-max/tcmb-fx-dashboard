@@ -724,17 +724,56 @@ if panel == "TL Mevduat":
 
     latest = tl_df.iloc[-1]
     st.subheader("TL Mevduat Görünümü")
-    a, b, c, d = st.columns(4)
-    a.metric("Toplam TL Mevduat", f"{tl_number(latest[total_col])} trilyon TL")
+    # Dört kartta da aynı punto; rakamlar tam sayıya yuvarlanır.
+    # Birim ayrı satırda gösterilerek rakamların sıkışması engellenir.
+    st.markdown("""
+    <style>
+      .tl-kpi-card {
+        border: 1px solid rgba(128,128,128,.22);
+        border-radius: 10px;
+        padding: 12px 10px;
+        min-height: 124px;
+        text-align: center;
+        box-sizing: border-box;
+      }
+      .tl-kpi-title {font-size: 12px; line-height: 1.3; min-height: 32px; color: #64748b; font-weight: 600;}
+      .tl-kpi-number {font-size: 21px; line-height: 1.3; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums;}
+      .tl-kpi-unit {font-size: 12px; line-height: 1.5; color: #64748b;}
+      .tl-kpi-delta {font-size: 12px; line-height: 1.5; font-weight: 600;}
+      @media(max-width: 1100px) { .tl-kpi-number {font-size: 18px;} }
+    </style>
+    """, unsafe_allow_html=True)
+
+    def tl_kpi(title, number, unit, delta=None, positive=None):
+        from html import escape as html_escape
+        color = ("#15803d" if positive else "#dc2626") if positive is not None else "#64748b"
+        delta_html = (f'<div class="tl-kpi-delta" style="color:{color}">{html_escape(delta)}</div>'
+                      if delta else '<div class="tl-kpi-delta">&nbsp;</div>')
+        st.markdown(
+            f'<div class="tl-kpi-card">'
+            f'<div class="tl-kpi-title">{html_escape(title)}</div>'
+            f'<div class="tl-kpi-number">{html_escape(number)}</div>'
+            f'<div class="tl-kpi-unit">{html_escape(unit)}</div>'
+            f'{delta_html}</div>', unsafe_allow_html=True
+        )
+
     resident = latest_value(tl_df, "Yurt İçi Yerleşikler")
-    b.metric("Yurt İçi Yerleşikler", f"{tl_number(resident)} trilyon TL" if pd.notna(resident) else "Veri yok")
     w, wp = latest["Haftalık Değişim"], latest["Haftalık Değişim (%)"]
     a4, p4 = latest["4 Haftalık Değişim"], latest["4 Haftalık Değişim (%)"]
-    c.metric("Haftalık Değişim", f"{tl_number(w, 1, True)} milyar TL",
-             f"{tl_number(wp, 2, True)}%" if pd.notna(wp) else None)
-    d.metric("4 Haftalık Değişim", f"{tl_number(a4, 1, True)} milyar TL",
-             f"{tl_number(p4, 2, True)}%" if pd.notna(p4) else None)
-    st.caption("Stoklar **trilyon TL**, haftalık ve dönemsel değişimler **milyar TL** cinsindedir.")
+    kpi_cols = st.columns(4, gap="small")
+    with kpi_cols[0]:
+        tl_kpi("Toplam TL Mevduat", tl_number(latest[total_col], 0), "Trilyon TL")
+    with kpi_cols[1]:
+        tl_kpi("Yurt İçi Yerleşikler", tl_number(resident, 0), "Trilyon TL")
+    with kpi_cols[2]:
+        tl_kpi("Haftalık Değişim", tl_number(w, 0, True), "Milyar TL",
+               f"{tl_number(wp, 0, True)}%" if pd.notna(wp) else None,
+               bool(w >= 0) if pd.notna(w) else None)
+    with kpi_cols[3]:
+        tl_kpi("4 Haftalık Değişim", tl_number(a4, 0, True), "Milyar TL",
+               f"{tl_number(p4, 0, True)}%" if pd.notna(p4) else None,
+               bool(a4 >= 0) if pd.notna(a4) else None)
+    st.caption("Stoklar trilyon TL, değişimler milyar TL cinsindedir. Kartlardaki değerler tam sayıya yuvarlanmıştır.")
 
     st.subheader("Toplam TL Mevduat")
     fig_total = tl_plot("Toplam TL Mevduat", [total_col])
@@ -793,7 +832,7 @@ if panel == "TL Mevduat":
         ],
     }
     st.subheader("Vadeli / Vadesiz Mevduat")
-    st.caption("Grafiklerin üst üste binmesini önlemek için müşteri gruplarını ayrı ayrı inceleyebilirsiniz.")
+    st.markdown("**Müşteri grubunu seçerek vadeli ve vadesiz mevduat gelişimini inceleyebilirsiniz.**")
     group = st.selectbox("Müşteri grubu", list(maturity_groups), key="tl_maturity_group")
     maturity_columns = [c for c in maturity_groups[group] if c in tl_df.columns]
     fig_maturity = None
@@ -864,6 +903,7 @@ import plotly.graph_objects as go
 
 st.header("Yabancı Para Mevduatları")
 st.caption("Gerçek ve tüzel kişiler, varlık kırılımları ve haftalık parite bileşenleri.")
+st.info("📅 **Analiz tarihlerini değiştirebilirsiniz.** Aşağıdaki başlangıç ve bitiş tarihlerini seçerek grafikleri ve tabloları istediğiniz dönem için güncelleyebilirsiniz.")
 start_date, end_date = show_date_filters("yp")
 
 all_yp_series = {
