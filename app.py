@@ -875,7 +875,11 @@ st.header("Yabancı Para Mevduatları")
 st.caption("Gerçek ve tüzel kişiler, varlık kırılımları ve haftalık parite bileşenleri.")
 start_date, end_date = show_date_filters("yp")
 
-all_yp_series = {**YP_LEVEL_SERIES, **YP_CHANGE_SERIES}
+all_yp_series = {
+    name: code
+    for name, code in {**YP_LEVEL_SERIES, **YP_CHANGE_SERIES}.items()
+    if "Diğer Döviz" not in name
+}
 with st.spinner("YP DTH verileri getiriliyor..."):
     try:
         yp_df, yp_fetched_at = fetch_evds_data(
@@ -1045,7 +1049,6 @@ st.plotly_chart(fig_parity, use_container_width=True)
 BREAKDOWN = {
     "USD": ("USD", "USD"),
     "EUR": ("EUR", "EUR"),
-    "Diğer Döviz": ("Diğer Döviz", "Diğer Döviz"),
     "Altın": ("Altın", "Altın"),
 }
 
