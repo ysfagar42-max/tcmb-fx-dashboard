@@ -1190,11 +1190,72 @@ st.dataframe(summary_table, use_container_width=True, hide_index=True)
 st.caption("Nominal = stok serisinin haftalık farkı. Parite Hariç ve Parite Etkisi = TCMB'nin ayrı haftalık EVDS serileri. Bu sütunlar otomatik olarak birbirine eşit kabul edilmez.")
 
 st.subheader("Detaylı Veri ve CSV")
-st.dataframe(yp_df.sort_values("Tarih", ascending=False), use_container_width=True, hide_index=True)
-st.download_button(
-    "YP verisini CSV indir", data=yp_df.to_csv(index=False).encode("utf-8-sig"),
-    file_name="yp_mevduat_analiz.csv", mime="text/csv",
+st.caption("Verileri müşteri grubu ve gösterim türüne göre filtreleyebilirsiniz. Tutarlar **milyar USD karşılığı** cinsindedir.")
+
+yp_detail_groups = {
+    "Genel": ["Yurt İçi Yerleşikler", "Gerçek Kişiler", "Tüzel Kişiler"],
+    "Gerçek Kişiler": ["Gerçek Kişiler", "Gerçek Kişiler - USD", "Gerçek Kişiler - EUR", "Gerçek Kişiler - Altın"],
+    "Tüzel Kişiler": ["Tüzel Kişiler", "Tüzel Kişiler - USD", "Tüzel Kişiler - EUR", "Tüzel Kişiler - Altın"],
+}
+yp_group_col, yp_type_col = st.columns(2)
+with yp_group_col:
+    yp_detail_group = st.selectbox("Müşteri grubu", list(yp_detail_groups), key="yp_detail_group")
+with yp_type_col:
+    yp_detail_type = st.selectbox(
+        "Gösterim", ["Mevduat Stoku", "Haftalık Nominal Değişim", "Haftalık Parite Hariç Değişim", "Haftalık Parite Etkisi"],
+        key="yp_detail_type"
+    )
+
+yp_selected_names = yp_detail_groups[yp_detail_group]
+yp_detail = pd.DataFrame({"Tarih": yp_df["Tarih"]})
+for yp_name in yp_selected_names:
+    if yp_detail_type == "Mevduat Stoku":
+        yp_source = yp_name
+    elif yp_detail_type == "Haftalık Nominal Değişim":
+        yp_source = yp_name
+    else:
+        yp_prefix = "Parite Hariç - " if yp_detail_type == "Haftalık Parite Hariç Değişim" else "Parite Etkisi - "
+        yp_source = yp_prefix + yp_name.replace(" - ", " ")
+        # Genel toplamların EVDS adları tire içerir; varlık bazlı seriler içermez.
+        if yp_name in ("Yurt İçi Yerleşikler", "Gerçek Kişiler", "Tüzel Kişiler"):
+            yp_source = yp_prefix + yp_name
+    if yp_source not in yp_df.columns:
+        continue
+    yp_values = pd.to_numeric(yp_df[yp_source], errors="coerce")
+    if yp_detail_type == "Haftalık Nominal Değişim":
+        yp_values = yp_values.diff()
+    yp_detail[yp_name] = yp_values / YP_SCALE
+
+yp_detail = yp_detail.sort_values("Tarih", ascending=False).reset_index(drop=True)
+yp_detail["Tarih"] = pd.to_datetime(yp_detail["Tarih"]).dt.strftime("%d.%m.%Y")
+yp_value_cols = [c for c in yp_detail.columns if c != "Tarih"]
+yp_signed = yp_detail_type != "Mevduat Stoku"
+yp_column_config = {
+    name: st.column_config.NumberColumn(
+        name, help="Milyar USD karşılığı", format="%+.2f" if yp_signed else "%.2f", width="medium"
+    ) for name in yp_value_cols
+}
+st.dataframe(
+    yp_detail, use_container_width=True, hide_index=True, height=390,
+    column_config={"Tarih": st.column_config.TextColumn("Tarih", width="small"), **yp_column_config},
 )
+st.caption("+ artış, − azalış anlamına gelir. Boş hücreler EVDS'de ilgili gözlemin bulunmadığını gösterir.")
+
+yp_csv_col, yp_full_csv_col = st.columns(2)
+with yp_csv_col:
+    st.download_button(
+        "Görüntülenen Tabloyu İndir (CSV)",
+        data=yp_detail.to_csv(index=False, float_format="%.2f").encode("utf-8-sig"),
+        file_name="yp_mevduat_secili_veri.csv", mime="text/csv", key="yp_filtered_csv",
+        use_container_width=True,
+    )
+with yp_full_csv_col:
+    st.download_button(
+        "Tüm Ham Veriyi İndir (CSV)",
+        data=yp_df.to_csv(index=False).encode("utf-8-sig"),
+        file_name="yp_mevduat_tum_veriler.csv", mime="text/csv", key="yp_full_csv",
+        use_container_width=True,
+    )
 
 # =========================================================
 # ÜST YÖNETİM E-POSTASI
