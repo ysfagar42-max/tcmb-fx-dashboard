@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import io
 from html import escape
+from urllib.parse import urlparse
 
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -85,6 +86,13 @@ except Exception:
         "tanımlarını kontrol et."
     )
     st.stop()
+
+# Dashboard bağlantısı doğrudan tanımlıdır; Secrets ayarı gerekmez.
+DASHBOARD_URL = "https://tcmb-fx-dashboard-8uo7dmttxrsgsnrh47ydxh.streamlit.app/"
+if DASHBOARD_URL:
+    parsed_dashboard_url = urlparse(DASHBOARD_URL)
+    if parsed_dashboard_url.scheme != "https" or not parsed_dashboard_url.netloc:
+        DASHBOARD_URL = ""
 
 EMAIL_RECIPIENT = "ysfagar42@gmail.com"
 
@@ -1196,7 +1204,7 @@ st.download_button(
 # ÜST YÖNETİM E-POSTASI
 # =========================================================
 
-def build_management_email(report_df, observation_date, period_start):
+def build_management_email(report_df, observation_date, period_start, dashboard_url=""):
     """
     E-posta içeriğini yalnızca EVDS'den gelen rakamlarla hazırlar.
     Stok: son gözlem, haftalık: aynı gözlemdeki parite hariç akım,
@@ -1298,6 +1306,24 @@ def build_management_email(report_df, observation_date, period_start):
           "Bilgilerinize sunulur.\n\nSaygılarımla,\n"
     )
 
+    if dashboard_url:
+        plain += "\nDashboard üzerinden detaylı analiz: " + dashboard_url + "\n"
+        dashboard_html = (
+            '<div style="margin:26px 0 10px;padding:18px 20px;'
+            'background:#edf3fb;border:1px solid #d6e3f4;border-radius:8px;">'
+            '<div style="font-size:13px;font-weight:bold;color:#24466d;margin-bottom:8px;">'
+            '&#8594; &nbsp; DETAYLI ANALİZ</div>'
+            '<div style="font-size:13px;color:#52647c;margin-bottom:12px;">'
+            'Güncel grafiklere ve ayrıntılı veri kırılımlarına dashboard üzerinden ulaşabilirsiniz.</div>'
+            '<a href="' + escape(dashboard_url, quote=True) + '" '
+            'style="display:inline-block;background:#173b63;color:#ffffff;'
+            'text-decoration:none;font-weight:bold;font-size:13px;'
+            'padding:11px 18px;border-radius:6px;">Dashboard’u Aç</a>'
+            '</div>'
+        )
+    else:
+        dashboard_html = ""
+
     table_rows = []
     for idx, r in enumerate(rows):
         background = "#f7f9fc" if idx % 2 == 0 else "#ffffff"
@@ -1367,6 +1393,7 @@ margin-bottom:10px;font-size:13px;line-height:1.8;">
 font-size:13px;line-height:1.8;">
 <strong>Tüzel Kişiler</strong><br>{html_summary("Tüzel Kişiler")}</div>
 <img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">
+{dashboard_html}
 <div style="font-size:13px;font-weight:bold;font-style:italic;color:#64748b;margin:30px 0 12px;">
 &#8594; &nbsp; Metodoloji notu</div>
 <p style="font-size:12px;color:#52647c;line-height:1.7;font-style:italic;">
@@ -1387,11 +1414,11 @@ color:#64748b;">Kaynak: TCMB EVDS &nbsp;•&nbsp; Otomatik oluşturulan mevduat 
 
 st.subheader("E-posta Raporu")
 st.caption(
-    "Üst yönetim formatında HTML e-posta: gerçek/tüzel kişi bazında "
+    "HTML e-posta: gerçek/tüzel kişi bazında "
     "USD, EUR ve XAU stokları, haftalık ve YTD parite hariç değişimleri. "
     "Özet grafikler PNG eki olarak gönderilir."
 )
-if st.button("YP Yönetim Raporunu E-posta ile Gönder"):
+if st.button("E-posta Gönder", type="primary"):
     try:
         year_start = pd.Timestamp(latest_date.year, 1, 1)
         # Seçili tarih aralığı yılbaşından sonra başlıyorsa,
@@ -1406,7 +1433,7 @@ if st.button("YP Yönetim Raporunu E-posta ile Gönder"):
         else:
             mail_df = yp_df
         subject, plain_body, html_body = build_management_email(
-            mail_df, latest_date, year_start
+            mail_df, latest_date, year_start, DASHBOARD_URL
         )
         # Yönetime okunabilir bir e-posta: esas tablo mesaj gövdesinde;
         # yalnızca özet grafikler ekte.
@@ -1428,7 +1455,7 @@ if st.button("YP Yönetim Raporunu E-posta ile Gönder"):
             subject, plain_body, attachments,
             html_body=html_body, inline_images=inline_images,
         )
-        st.success("Yönetim formatındaki rapor e-posta ile gönderildi.")
+        st.success("E-posta başarıyla gönderildi.")
     except Exception as exc:
         st.error(f"E-posta gönderilemedi: {exc}")
 
