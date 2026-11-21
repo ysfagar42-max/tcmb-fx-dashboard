@@ -6,8 +6,10 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import io
+from html import escape
 
 from email.message import EmailMessage
+from email.utils import make_msgid
 from datetime import date, datetime, timedelta
 
 
@@ -519,21 +521,31 @@ def fig_to_png(fig):
 
     return buffer.getvalue()
 
-def send_email(subject, body, attachments):
+def send_email(subject, body, attachments, html_body=None, inline_images=None):
+    """HTML görsellerini CID ile göm; PNG eklerini ayrıca sakla."""
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = GMAIL_ADDRESS
     message["To"] = EMAIL_RECIPIENT
     message.set_content(body)
-
+    if html_body:
+        cid_map = {}
+        for label, _ in (inline_images or []):
+            cid_map[label] = make_msgid(domain="mevduat-raporu.local")
+        for label, cid in cid_map.items():
+            html_body = html_body.replace("{" + label + "}", cid[1:-1])
+        message.add_alternative(html_body, subtype="html")
+        html_part = message.get_payload()[-1]
+        for label, image_bytes in (inline_images or []):
+            html_part.add_related(
+                image_bytes, maintype="image", subtype="png",
+                cid=cid_map[label], filename=f"{label}.png",
+                disposition="inline",
+            )
     for filename, image_bytes in attachments:
         message.add_attachment(
-            image_bytes,
-            maintype="image",
-            subtype="png",
-            filename=filename,
+            image_bytes, maintype="image", subtype="png", filename=filename,
         )
-
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         smtp.send_message(message)
@@ -1165,18 +1177,231 @@ st.download_button(
     file_name="yp_mevduat_analiz.csv", mime="text/csv",
 )
 
-st.subheader("E-posta Raporu")
-st.caption("Grafikler PNG formatında hazırlanır; Kaleido gerektirmez.")
-if st.button("YP Raporunu E-posta ile Gönder"):
-    try:
-        attachments = [(f"{name}.png", fig_to_png(fig)) for name, fig in email_figures]
-        send_email(
-            "YP Mevduat | Haftalık Analiz",
-            f"YP mevduat analiz raporu. Son gözlem: {latest_date:%d.%m.%Y}.\n"
-            "Nominal ve parite hariç grafikler ile YTD kümülatif analiz ektedir.",
-            attachments,
+# =========================================================
+# ÜST YÖNETİM E-POSTASI
+# =========================================================
+
+def build_management_email(report_df, observation_date, period_start):
+    """
+    E-posta içeriğini yalnızca EVDS'den gelen rakamlarla hazırlar.
+    Stok: son gözlem, haftalık: aynı gözlemdeki parite hariç akım,
+    YTD: 1 Ocak'tan son gözleme haftalık akımların toplamı.
+    """
+    assets = (("USD", "USD"), ("EUR", "EUR"), ("XAU (Altın)", "Altın"))
+    segments = ("Gerçek Kişiler", "Tüzel Kişiler")
+    period = report_df.loc[
+        (report_df["Tarih"] >= period_start)
+        & (report_df["Tarih"] <= observation_date)
+    ].sort_values("Tarih")
+    rows = []
+    for segment in segments:
+        for label, suffix in assets:
+            level_col = f"{segment} - {suffix}"
+            change_col = f"Parite Hariç - {segment} {suffix}"
+            stock = (
+                last_valid(report_df.loc[
+                    report_df["Tarih"] <= observation_date, level_col
+                ]) if level_col in report_df else float("nan")
+            )
+            weekly = (
+                last_valid(report_df.loc[
+                    report_df["Tarih"] <= observation_date, change_col
+                ]) if change_col in report_df else float("nan")
+            )
+            flows = (
+                pd.to_numeric(period[change_col], errors="coerce").dropna()
+                if change_col in period else pd.Series(dtype=float)
+            )
+            ytd = flows.sum() if not flows.empty else float("nan")
+            rows.append({
+                "segment": segment, "asset": label,
+                "stock": stock / YP_SCALE,
+                "weekly": weekly / YP_SCALE,
+                "ytd": ytd / YP_SCALE,
+            })
+
+    def num(value, signed=False):
+        if pd.isna(value):
+            return "—"
+        return f"{value:{'+' if signed else ''},.2f}"
+
+    def colored(value):
+        if pd.isna(value):
+            return '<span style="color:#94a3b8">—</span>'
+        color = "#13795b" if value > 0 else "#b42318" if value < 0 else "#475569"
+        return f'<span style="font-weight:700;color:{color}">{num(value, True)}</span>'
+
+    def plain_summary(segment):
+        items = [r for r in rows if r["segment"] == segment]
+        return "; ".join(
+            f'{r["asset"]} {num(r["ytd"], True)}'
+            for r in items
         )
-        st.success("Rapor e-posta ile gönderildi.")
+
+    def html_summary(segment):
+        items = [r for r in rows if r["segment"] == segment]
+        return " &nbsp;·&nbsp; ".join(
+            f'<strong>{escape(r["asset"])}</strong> {colored(r["ytd"])}'
+            for r in items
+        )
+
+    header = (
+        f"YP Mevduat | Yönetim Özeti | {observation_date:%d.%m.%Y}"
+    )
+    intro = (
+        "Gerçek ve tüzel kişilerin USD, EUR ve altın mevduat stokları, "
+        "haftalık parite etkisinden arındırılmış değişimleri ve "
+        f"{period_start:%d.%m.%Y} tarihinden itibaren birikimli "
+        "parite hariç değişimleri aşağıda sunulmaktadır."
+    )
+    text_rows = [
+        f'{r["segment"]} | {r["asset"]} | '
+        f'Stok: {num(r["stock"])} | '
+        f'Haftalık: {num(r["weekly"], True)} | '
+        f'YTD: {num(r["ytd"], True)}'
+        for r in rows
+    ]
+    plain = (
+        "Merhaba,\n\n" + intro
+        + "\n\nBİRİM: MİLYAR USD KARŞILIĞI\n\n"
+        + "\n".join(text_rows)
+        + "\n\nYTD PARİTE HARİÇ DEĞİŞİM\n"
+        + "Gerçek Kişiler: " + plain_summary("Gerçek Kişiler")
+        + "\nTüzel Kişiler: " + plain_summary("Tüzel Kişiler")
+        + "\n\nNot: Stoklar dönem sonu bakiyesidir. Haftalık ve YTD "
+          "rakamları parite etkisinden arındırılmış değişimdir; "
+          "YTD stok bakiyesi değildir. (+) artış, (-) azalıştır. "
+          "Eksik EVDS verileri — ile gösterilir. "
+          "YTD haftalık serilerin toplamıdır.\n\n"
+          "Bilgilerinize sunulur.\n"
+    )
+
+    table_rows = []
+    for idx, r in enumerate(rows):
+        background = "#f7f9fc" if idx % 2 == 0 else "#ffffff"
+        border = "border-top:2px solid #cbd5e1;" if idx == 3 else ""
+        table_rows.append(
+            f'<tr style="background:{background};{border}">'
+            f'<td style="padding:12px 10px;border-bottom:1px solid #e5eaf1;">'
+            f'<strong>{escape(r["segment"])}</strong></td>'
+            f'<td style="padding:12px 10px;border-bottom:1px solid #e5eaf1;">'
+            f'<strong>{escape(r["asset"])}</strong></td>'
+            f'<td align="right" style="padding:12px 10px;border-bottom:1px solid #e5eaf1;'
+            f'white-space:nowrap;font-weight:600;color:#21344d;">{num(r["stock"])}</td>'
+            f'<td align="right" style="padding:12px 10px;border-bottom:1px solid #e5eaf1;'
+            f'white-space:nowrap;">{colored(r["weekly"])}</td>'
+            f'<td align="right" style="padding:12px 10px;border-bottom:1px solid #e5eaf1;'
+            f'white-space:nowrap;">{colored(r["ytd"])}</td></tr>'
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:28px 12px;background:#f2f5fa;
+font-family:Arial,Helvetica,sans-serif;color:#172b4d;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"
+style="width:100%;max-width:850px;margin:auto;background:#fff;border:1px solid #e1e7f0;
+border-radius:12px;">
+<tr><td style="background:#142c4c;padding:30px 34px;color:#fff;">
+<div style="font-size:12px;letter-spacing:2px;color:#a9c5e5;font-weight:bold;">
+HAFTALIK MEVDUAT ANALİZİ</div>
+<h1 style="font-size:25px;line-height:1.25;margin:12px 0 8px;color:#fff;">
+Yabancı Para Mevduatları</h1>
+<div style="font-size:14px;color:#dce8f7;">Yönetim Özeti &nbsp;|&nbsp;
+Veri tarihi: {observation_date:%d.%m.%Y}</div>
+</td></tr>
+<tr><td style="padding:28px 34px 10px;">
+<p style="font-size:14px;line-height:1.7;margin:0 0 20px;">
+Merhaba,<br><br>{escape(intro)}</p>
+<div style="font-size:13px;font-weight:bold;color:#24466d;margin:22px 0 12px;">
+01 &nbsp; MEVDUAT STOKLARI VE DEĞİŞİMLER</div>
+<div style="font-size:12px;color:#64748b;margin-bottom:10px;">
+Tüm tutarlar <strong>milyar USD karşılığıdır</strong>.
+Stok = rapor tarihindeki bakiye; haftalık / YTD = parite etkisi hariç değişim.</div>
+<table cellpadding="0" cellspacing="0" border="0"
+style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr style="background:#dce6f2;color:#172f50;">
+<th align="left" style="padding:12px 10px;">Müşteri grubu</th>
+<th align="left" style="padding:12px 10px;">Varlık</th>
+<th align="right" style="padding:12px 10px;">Stok</th>
+<th align="right" style="padding:12px 10px;">Haftalık</th>
+<th align="right" style="padding:12px 10px;">YTD</th>
+</tr></thead><tbody>{''.join(table_rows)}</tbody></table>
+<div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
+02 &nbsp; GRAFİKLERLE HAFTALIK GÖRÜNÜM</div>
+<p style="font-size:12px;color:#64748b;margin:0 0 12px;">Mevduat stokları ve parite etkisinden arındırılmış haftalık değişim</p>
+<img src="cid:{{stock_chart}}" alt="Gerçek ve tüzel kişi mevduat stokları" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
+<img src="cid:{{weekly_chart}}" alt="Haftalık parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
+<div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
+03 &nbsp; YILBAŞINDAN BUGÜNE PARİTE HARİÇ DEĞİŞİM</div>
+<div style="padding:14px 16px;background:#f3f7fc;border-left:3px solid #247ba0;
+margin-bottom:10px;font-size:13px;line-height:1.8;">
+<strong>Gerçek Kişiler</strong><br>{html_summary("Gerçek Kişiler")}</div>
+<div style="padding:14px 16px;background:#f3f7fc;border-left:3px solid #f28e2b;
+font-size:13px;line-height:1.8;">
+<strong>Tüzel Kişiler</strong><br>{html_summary("Tüzel Kişiler")}</div>
+<img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">
+<div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 12px;">
+04 &nbsp; METODOLOJİ NOTU</div>
+<p style="font-size:12px;color:#52647c;line-height:1.7;">
+YTD dönemi: {period_start:%d.%m.%Y}–{observation_date:%d.%m.%Y}.
+YTD tutarlar, ilgili TCMB EVDS haftalık parite hariç değişim serilerinin
+birikimli toplamıdır. Stok tutarlarıyla doğrudan eşitlenmemelidir.
+Artı (+) artışı, eksi (−) azalışı gösterir. Eksik veriler — ile gösterilir.
+Varlık kırılımları USD, EUR ve XAU'dur; tutarlar USD karşılığı bazındadır.</p>
+<p style="font-size:14px;line-height:1.7;margin:24px 0 22px;">
+Bilgilerinize sunulur.</p>
+</td></tr>
+<tr><td style="background:#f2f5fa;padding:16px 34px;font-size:11px;
+color:#64748b;">Kaynak: TCMB EVDS &nbsp;•&nbsp; Otomatik oluşturulan mevduat analiz raporu
+&nbsp;•&nbsp; {observation_date:%d.%m.%Y}</td></tr>
+</table></body></html>"""
+    return header, plain, html
+
+
+st.subheader("E-posta Raporu")
+st.caption(
+    "Üst yönetim formatında HTML e-posta: gerçek/tüzel kişi bazında "
+    "USD, EUR ve XAU stokları, haftalık ve YTD parite hariç değişimleri. "
+    "Özet grafikler PNG eki olarak gönderilir."
+)
+if st.button("YP Yönetim Raporunu E-posta ile Gönder"):
+    try:
+        year_start = pd.Timestamp(latest_date.year, 1, 1)
+        # Seçili tarih aralığı yılbaşından sonra başlıyorsa,
+        # YTD'yi eksik hesaplamamak için yılbaşından itibaren ayrıca çek.
+        if yp_df["Tarih"].min() > year_start:
+            with st.spinner("Tam yılbaşından bugüne veri hazırlanıyor..."):
+                mail_df, _ = fetch_evds_data(
+                    year_start.strftime("%d-%m-%Y"),
+                    latest_date.strftime("%d-%m-%Y"),
+                    tuple(all_yp_series.items()),
+                )
+        else:
+            mail_df = yp_df
+        subject, plain_body, html_body = build_management_email(
+            mail_df, latest_date, year_start
+        )
+        # Yönetime okunabilir bir e-posta: esas tablo mesaj gövdesinde;
+        # yalnızca özet grafikler ekte.
+        # Grafikler hem e-postanın içinde görünür hem PNG eki olarak saklanır.
+        inline_images = [
+            ("stock_chart", fig_to_png(fig_main)),
+            ("weekly_chart", fig_to_png(fig_adjusted)),
+        ]
+        if "ytd_fig" in globals() and len(ytd_fig.data) > 0:
+            inline_images.append(("ytd_chart", fig_to_png(ytd_fig)))
+        else:
+            # Eksik YTD grafiği varsa kırık görsel yerine açıklama göster.
+            html_body = html_body.replace(
+                '<img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">',
+                '<p style="color:#64748b;font-size:12px;">YTD grafik verisi bulunamadı.</p>',
+            )
+        attachments = [(f"{name}.png", png) for name, png in inline_images]
+        send_email(
+            subject, plain_body, attachments,
+            html_body=html_body, inline_images=inline_images,
+        )
+        st.success("Yönetim formatındaki rapor e-posta ile gönderildi.")
     except Exception as exc:
         st.error(f"E-posta gönderilemedi: {exc}")
 
