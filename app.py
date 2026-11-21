@@ -423,13 +423,28 @@ def fig_to_png(fig):
 
         if trace.type == "bar":
 
-            ax.bar(
+            bars = ax.bar(
                 x,
                 y,
                 label=trace.name or "Seri",
                 alpha=0.8,
+                width=2.2 if len(x) > 1 else 0.6,
             )
-
+            # Son haftanın tutarını her seri için çubuk üzerinde göster.
+            valid_indices = [i for i, v in enumerate(y) if pd.notna(v)]
+            if valid_indices:
+                idx = valid_indices[-1]
+                last_bar = bars[idx]
+                last_y = float(y[idx])
+                ax.annotate(
+                    f"{last_y:+,.2f}",
+                    xy=(last_bar.get_x() + last_bar.get_width() / 2, last_y),
+                    xytext=(0, -13 if last_y < 0 else 7),
+                    textcoords="offset points", ha="center",
+                    va="top" if last_y < 0 else "bottom",
+                    fontsize=9, fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.9),
+                )
             has_data = True
 
         elif trace.type == "scatter":
@@ -1245,8 +1260,15 @@ def build_management_email(report_df, observation_date, period_start):
             for r in items
         )
 
+    def html_weekly_summary(segment):
+        items = [r for r in rows if r["segment"] == segment]
+        return " &nbsp;·&nbsp; ".join(
+            f'<strong>{escape(r["asset"])}</strong> {colored(r["weekly"])}'
+            for r in items
+        )
+
     header = (
-        f"YP Mevduat | Yönetim Özeti | {observation_date:%d.%m.%Y}"
+        f"YP Mevduat | Haftalık Analiz | {observation_date:%d.%m.%Y}"
     )
     intro = (
         "Gerçek ve tüzel kişilerin USD, EUR ve altın mevduat stokları, "
@@ -1273,7 +1295,7 @@ def build_management_email(report_df, observation_date, period_start):
           "YTD stok bakiyesi değildir. (+) artış, (-) azalıştır. "
           "Eksik EVDS verileri — ile gösterilir. "
           "YTD haftalık serilerin toplamıdır.\n\n"
-          "Bilgilerinize sunulur.\n"
+          "Bilgilerinize sunulur.\n\nSaygılarımla,\n"
     )
 
     table_rows = []
@@ -1306,14 +1328,14 @@ border-radius:12px;">
 HAFTALIK MEVDUAT ANALİZİ</div>
 <h1 style="font-size:25px;line-height:1.25;margin:12px 0 8px;color:#fff;">
 Yabancı Para Mevduatları</h1>
-<div style="font-size:14px;color:#dce8f7;">Yönetim Özeti &nbsp;|&nbsp;
+<div style="font-size:14px;color:#dce8f7;">Haftalık Rapor &nbsp;|&nbsp;
 Veri tarihi: {observation_date:%d.%m.%Y}</div>
 </td></tr>
 <tr><td style="padding:28px 34px 10px;">
 <p style="font-size:14px;line-height:1.7;margin:0 0 20px;">
 Merhaba,<br><br>{escape(intro)}</p>
 <div style="font-size:13px;font-weight:bold;color:#24466d;margin:22px 0 12px;">
-01 &nbsp; MEVDUAT STOKLARI VE DEĞİŞİMLER</div>
+&#8594; &nbsp; MEVDUAT STOKLARI VE DEĞİŞİMLER</div>
 <div style="font-size:12px;color:#64748b;margin-bottom:10px;">
 Tüm tutarlar <strong>milyar USD karşılığıdır</strong>.
 Stok = rapor tarihindeki bakiye; haftalık / YTD = parite etkisi hariç değişim.</div>
@@ -1327,12 +1349,17 @@ style="width:100%;border-collapse:collapse;font-size:13px;">
 <th align="right" style="padding:12px 10px;">YTD</th>
 </tr></thead><tbody>{''.join(table_rows)}</tbody></table>
 <div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
-02 &nbsp; GRAFİKLERLE HAFTALIK GÖRÜNÜM</div>
+&#8594; &nbsp; GRAFİKLERLE HAFTALIK GÖRÜNÜM</div>
 <p style="font-size:12px;color:#64748b;margin:0 0 12px;">Mevduat stokları ve parite etkisinden arındırılmış haftalık değişim</p>
+<div style="font-size:12px;color:#64748b;margin:0 0 8px;">Haftalık parite hariç değişim (milyar USD karşılığı)</div>
+<div style="padding:12px 14px;background:#f3f7fc;border-left:3px solid #247ba0;margin-bottom:8px;font-size:13px;line-height:1.8;">
+<strong>Gerçek Kişiler</strong><br>{html_weekly_summary("Gerçek Kişiler")}</div>
+<div style="padding:12px 14px;background:#f3f7fc;border-left:3px solid #f28e2b;margin-bottom:16px;font-size:13px;line-height:1.8;">
+<strong>Tüzel Kişiler</strong><br>{html_weekly_summary("Tüzel Kişiler")}</div>
 <img src="cid:{{stock_chart}}" alt="Gerçek ve tüzel kişi mevduat stokları" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
 <img src="cid:{{weekly_chart}}" alt="Haftalık parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
 <div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
-03 &nbsp; YILBAŞINDAN BUGÜNE PARİTE HARİÇ DEĞİŞİM</div>
+&#8594; &nbsp; YILBAŞINDAN BUGÜNE PARİTE HARİÇ DEĞİŞİM</div>
 <div style="padding:14px 16px;background:#f3f7fc;border-left:3px solid #247ba0;
 margin-bottom:10px;font-size:13px;line-height:1.8;">
 <strong>Gerçek Kişiler</strong><br>{html_summary("Gerçek Kişiler")}</div>
@@ -1340,16 +1367,16 @@ margin-bottom:10px;font-size:13px;line-height:1.8;">
 font-size:13px;line-height:1.8;">
 <strong>Tüzel Kişiler</strong><br>{html_summary("Tüzel Kişiler")}</div>
 <img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">
-<div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 12px;">
-04 &nbsp; METODOLOJİ NOTU</div>
-<p style="font-size:12px;color:#52647c;line-height:1.7;">
+<div style="font-size:13px;font-weight:bold;font-style:italic;color:#64748b;margin:30px 0 12px;">
+&#8594; &nbsp; Metodoloji notu</div>
+<p style="font-size:12px;color:#52647c;line-height:1.7;font-style:italic;">
 YTD dönemi: {period_start:%d.%m.%Y}–{observation_date:%d.%m.%Y}.
 YTD tutarlar, ilgili TCMB EVDS haftalık parite hariç değişim serilerinin
 birikimli toplamıdır. Stok tutarlarıyla doğrudan eşitlenmemelidir.
 Artı (+) artışı, eksi (−) azalışı gösterir. Eksik veriler — ile gösterilir.
 Varlık kırılımları USD, EUR ve XAU'dur; tutarlar USD karşılığı bazındadır.</p>
 <p style="font-size:14px;line-height:1.7;margin:24px 0 22px;">
-Bilgilerinize sunulur.</p>
+Bilgilerinize sunulur.<br><br>Saygılarımla,</p>
 </td></tr>
 <tr><td style="background:#f2f5fa;padding:16px 34px;font-size:11px;
 color:#64748b;">Kaynak: TCMB EVDS &nbsp;•&nbsp; Otomatik oluşturulan mevduat analiz raporu
