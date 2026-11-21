@@ -915,20 +915,38 @@ def last_valid(series):
     return values.iloc[-1] if not values.empty else float("nan")
 
 
-def style_chart(fig, unit="EVDS seri birimi", zero=False):
+# EVDS YP DTH stok ve değişim serileri milyon USD karşılığı olarak sunulur.
+# Görsel ve tablo için 1.000'e bölerek milyar USD karşılığına çeviriyoruz.
+YP_SCALE = 1000.0
+YP_UNIT = "Milyar USD karşılığı"
+
+
+def display_number(value, digits=2, signed=True):
+    if pd.isna(value):
+        return "Veri yok"
+    sign = "+" if signed else ""
+    return f"{value:{sign},.{digits}f}"
+
+
+def style_chart(fig, unit=YP_UNIT, zero=False):
+    # Başlık, yatay lejant ve grafik alanı arasında ayrı boşluklar.
     fig.update_layout(
-        template="plotly_white", hovermode="x unified", height=400,
-        margin=dict(l=35, r=115, t=60, b=45),
-        legend_title_text="", legend=dict(orientation="h", y=1.13, x=0),
+        template="plotly_white", hovermode="x unified", height=440,
+        margin=dict(l=65, r=150, t=115, b=55),
+        title=dict(x=0.015, y=0.97, xanchor="left", yanchor="top", font=dict(size=17)),
+        legend_title_text="", legend=dict(
+            orientation="h", y=1.075, yanchor="bottom", x=0, xanchor="left",
+            bgcolor="rgba(255,255,255,0.9)"),
         xaxis_title=None, yaxis_title=unit,
         font=dict(size=12),
+        bargap=0.24,
     )
     fig.update_xaxes(tickformat="%d.%m.%y", showgrid=False)
     fig.update_yaxes(tickformat=",.2f", zeroline=zero, separatethousands=True)
     return fig
 
 
-def plot_lines(data, columns, title, unit="EVDS seri birimi", colors=None):
+def plot_lines(data, columns, title, unit=YP_UNIT, colors=None):
     fig = go.Figure()
     for label, col in columns.items():
         if col not in data:
@@ -937,21 +955,22 @@ def plot_lines(data, columns, title, unit="EVDS seri birimi", colors=None):
         if valid.empty:
             continue
         color = (colors or SEGMENTS).get(label, "#475569")
+        values = valid[col] / YP_SCALE
         fig.add_trace(go.Scatter(
-            x=valid["Tarih"], y=valid[col], name=label,
+            x=valid["Tarih"], y=values, name=label,
             mode="lines", line=dict(width=2.8, color=color),
         ))
-        x, y = valid.iloc[-1]["Tarih"], valid.iloc[-1][col]
+        x, y = valid.iloc[-1]["Tarih"], values.iloc[-1]
         fig.add_annotation(
-            x=x, y=y, text=f"{y:+,.2f}", showarrow=False,
-            xanchor="left", xshift=10, font=dict(color=color, size=11),
-            bgcolor="rgba(255,255,255,.9)", bordercolor=color, borderwidth=1,
+            x=x, y=y, text=display_number(y), showarrow=False,
+            xanchor="left", xshift=12, font=dict(color=color, size=11),
+            bgcolor="rgba(255,255,255,.95)", bordercolor=color, borderwidth=1,
         )
     fig.update_layout(title=title)
     return style_chart(fig, unit)
 
 
-def plot_weekly_bars(data, columns, title, unit="EVDS seri birimi", colors=None):
+def plot_weekly_bars(data, columns, title, unit=YP_UNIT, colors=None):
     fig = go.Figure()
     for label, col in columns.items():
         if col not in data:
@@ -960,16 +979,17 @@ def plot_weekly_bars(data, columns, title, unit="EVDS seri birimi", colors=None)
         if valid.empty:
             continue
         color = (colors or SEGMENTS).get(label, "#475569")
+        values = valid[col] / YP_SCALE
         fig.add_trace(go.Bar(
-            x=valid["Tarih"], y=valid[col], name=label,
+            x=valid["Tarih"], y=values, name=label,
             marker_color=color,
-            customdata=[f"{v:+,.2f}" for v in valid[col]],
-            hovertemplate="%{x|%d.%m.%Y}<br>%{customdata}<extra>%{fullData.name}</extra>",
+            customdata=[display_number(v) for v in values],
+            hovertemplate="%{x|%d.%m.%Y}<br>%{customdata} milyar<extra>%{fullData.name}</extra>",
         ))
-        x, y = valid.iloc[-1]["Tarih"], valid.iloc[-1][col]
+        x, y = valid.iloc[-1]["Tarih"], values.iloc[-1]
         fig.add_annotation(
-            x=x, y=y, text=f"{y:+,.2f}", showarrow=True,
-            arrowhead=0, ax=40, ay=(-30 if y >= 0 else 30),
+            x=x, y=y, text=display_number(y), showarrow=True,
+            arrowhead=0, ax=45, ay=(-30 if y >= 0 else 30),
             font=dict(color=color, size=11),
             bgcolor="rgba(255,255,255,.95)", bordercolor=color, borderwidth=1,
         )
@@ -984,20 +1004,22 @@ for widget, segment in zip((c1, c2), SEGMENTS):
     diff = yp_df[segment].diff().dropna()
     delta = diff.iloc[-1] if not diff.empty else float("nan")
     widget.metric(
-        segment, f"{value:,.2f}" if pd.notna(value) else "Veri yok",
-        delta=f"{delta:+,.2f} (haftalık)" if pd.notna(delta) else None,
+        segment, f"{value / YP_SCALE:,.2f} milyar" if pd.notna(value) else "Veri yok",
+        delta=f"{delta / YP_SCALE:+,.2f} milyar (haftalık)" if pd.notna(delta) else None,
     )
-st.caption("Seviye ve haftalık değişim tutarları EVDS kaynak serilerinin birimindedir; toplam YP mevduat bu kartlarda gösterilmez.")
+st.caption("Tutarlar milyar USD karşılığıdır. Toplam YP mevduat stok kartı gösterilmez.")
 
 st.subheader("Haftalık Parite Etkisinden Arındırılmış Değişim")
 parity_main = {
+    "Toplam Yurt İçi Yerleşikler": "Parite Hariç - Yurt İçi Yerleşikler",
     "Gerçek Kişiler": "Parite Hariç - Gerçek Kişiler",
     "Tüzel Kişiler": "Parite Hariç - Tüzel Kişiler",
 }
-p1, p2 = st.columns(2)
-for widget, (segment, col) in zip((p1, p2), parity_main.items()):
-    widget.metric(segment, fmt(last_valid(yp_df[col])) if col in yp_df else "Veri yok")
-st.caption("Bu göstergeler TCMB'nin haftalık parite etkisinden arındırılmış değişim serileridir; stok farkından hesaplanmaz.")
+p1, p2, p3 = st.columns(3)
+for widget, (segment, col) in zip((p1, p2, p3), parity_main.items()):
+    value = last_valid(yp_df[col]) if col in yp_df else float("nan")
+    widget.metric(segment, f"{value / YP_SCALE:+,.2f} milyar" if pd.notna(value) else "Veri yok")
+st.caption("Toplam yurt içi yerleşikler TCMB'nin kendi serisidir; gerçek ve tüzel kişilerin hesaplanmış toplamı değildir. Birim: milyar USD karşılığı.")
 
 st.subheader("Mevduat Seviyeleri ve Nominal Değişim")
 fig_main = plot_lines(yp_df, {s: s for s in SEGMENTS}, "Gerçek ve Tüzel Kişi Mevduat Seviyeleri")
@@ -1010,7 +1032,7 @@ fig_nominal = plot_weekly_bars(
 )
 st.plotly_chart(fig_nominal, use_container_width=True)
 fig_adjusted = plot_weekly_bars(
-    yp_df, parity_main, "Haftalık Parite Hariç Değişim"
+    yp_df, {s: parity_main[s] for s in SEGMENTS}, "Haftalık Parite Hariç Değişim"
 )
 st.plotly_chart(fig_adjusted, use_container_width=True)
 fig_parity = plot_weekly_bars(
@@ -1028,7 +1050,7 @@ BREAKDOWN = {
 }
 
 st.subheader("Varlık Türüne Göre Analiz")
-st.caption("Her varlık için seviyeler, haftalık nominal değişim, parite hariç değişim ve parite etkisi ayrı ayrı gösterilir. Sağdaki etiketler son geçerli gözleme aittir.")
+st.caption("Her varlık için mevduat seviyesi, haftalık nominal değişim ve parite hariç değişim gösterilir. Sağdaki etiketler son gözleme aittir. Birim: milyar USD karşılığı.")
 summary_rows = []
 email_figures = [("ana_seviye", fig_main), ("ana_nominal", fig_nominal),
                  ("ana_parite_haric", fig_adjusted), ("ana_parite_etkisi", fig_parity)]
@@ -1046,7 +1068,6 @@ for asset in BREAKDOWN:
             ("seviye", plot_lines(yp_df, level_cols, f"{asset} — Mevduat Seviyeleri")),
             ("nominal", plot_weekly_bars(nominal_df, {s: s for s in SEGMENTS}, f"{asset} — Haftalık Nominal Değişim")),
             ("parite_haric", plot_weekly_bars(yp_df, adjusted_cols, f"{asset} — Parite Hariç Değişim")),
-            ("parite_etkisi", plot_weekly_bars(yp_df, parity_cols, f"{asset} — Parite Etkisi")),
         ]
         for kind, fig in charts:
             st.plotly_chart(fig, use_container_width=True)
@@ -1065,11 +1086,20 @@ st.subheader("Yılbaşından Bugüne | Birikimli Parite Hariç Değişim")
 selected_start = pd.to_datetime(start_date, format="%d-%m-%Y")
 year_start = pd.Timestamp(latest_date.year, 1, 1)
 if selected_start > year_start:
-    st.info("YTD hesaplaması için yılbaşından itibaren veri gerekir. Seçili tarih aralığı yılbaşından sonra başladığı için YTD bölümü gösterilmiyor. Başlangıç tarihini 1 Ocak'a alın.")
+    st.info("YTD için 1 Ocak'tan itibaren veri gerekir. Tarih aralığının başlangıcını 1 Ocak'a alın.")
 else:
     ytd_data = yp_df[(yp_df["Tarih"] >= year_start) & (yp_df["Tarih"] <= latest_date)]
     ytd_rows = []
     ytd_fig = go.Figure()
+    asset_colors = {
+        "Gerçek Kişiler | USD": "#247BA0",
+        "Gerçek Kişiler | EUR": "#16A34A",
+        "Gerçek Kişiler | Altın": "#8B5CF6",
+        "Tüzel Kişiler | USD": "#F28E2B",
+        "Tüzel Kişiler | EUR": "#D9487D",
+        "Tüzel Kişiler | Altın": "#64748B",
+    }
+    summary_by_segment = {segment: [] for segment in SEGMENTS}
     for segment in SEGMENTS:
         for asset in ("USD", "EUR", "Altın"):
             col = f"Parite Hariç - {segment} {asset}"
@@ -1078,26 +1108,51 @@ else:
             valid = ytd_data[["Tarih", col]].dropna()
             if valid.empty:
                 continue
-            cumulative = valid[col].cumsum()
-            total = cumulative.iloc[-1]
-            ytd_rows.append({"Grup": segment, "Varlık": asset,
-                             "Birikimli Parite Hariç Değişim": total,
-                             "Gözlem Sayısı": len(valid)})
+            cumulative = valid[col].cumsum() / YP_SCALE
+            total = float(cumulative.iloc[-1])
+            name = f"{segment} | {asset}"
+            color = asset_colors[name]
+            ytd_rows.append({"Grup": segment, "Varlık": "XAU (Altın)" if asset == "Altın" else asset,
+                             "YTD Parite Hariç (milyar USD karşılığı)": total})
+            summary_by_segment[segment].append(f"{asset if asset != 'Altın' else 'XAU'} {total:+,.2f} milyar")
             ytd_fig.add_trace(go.Scatter(
                 x=valid["Tarih"], y=cumulative,
-                mode="lines", name=f"{segment} | {asset}",
+                mode="lines", name=name,
+                line=dict(width=2.6, color=color),
+                hovertemplate="%{x|%d.%m.%Y}<br>%{y:+,.2f} milyar<extra>%{fullData.name}</extra>",
             ))
+            ytd_fig.add_annotation(
+                x=valid["Tarih"].iloc[-1], y=total, text=f"{total:+,.2f}",
+                showarrow=False, xanchor="left", xshift=10,
+                font=dict(size=11, color=color),
+                bgcolor="rgba(255,255,255,0.95)", bordercolor=color, borderwidth=1,
+            )
     if ytd_rows:
+        st.markdown("**YTD parite etkisinden arındırılmış pozisyon değişimleri**")
+        for segment, values in summary_by_segment.items():
+            if values:
+                st.markdown(f"**{segment}:** " + " · ".join(values))
+        st.caption("Pozitif (+) değer artışı, negatif (−) değer azalışı gösterir. Bunlar dönem sonu stok pozisyonu değil, yılbaşından beri birikimli parite hariç değişimdir.")
         ytd_fig.update_layout(title=f"{latest_date.year} YTD — Kümülatif Parite Hariç Değişim")
         st.plotly_chart(style_chart(ytd_fig), use_container_width=True)
-        st.dataframe(pd.DataFrame(ytd_rows), use_container_width=True, hide_index=True)
+        ytd_table = pd.DataFrame(ytd_rows)
+        ytd_table["YTD Parite Hariç (milyar USD karşılığı)"] = ytd_table[
+            "YTD Parite Hariç (milyar USD karşılığı)"
+        ].map(lambda value: f"{value:+,.2f}")
+        st.dataframe(ytd_table, use_container_width=True, hide_index=True)
         email_figures.append(("ytd_birikimli_parite_haric", ytd_fig))
-        st.caption("YTD değerleri, yılbaşından son yayımlanan gözleme kadar EVDS haftalık parite hariç değişimlerinin toplamıdır. USD/EUR/altın başlıkları varlık kırılımını belirtir; birimler EVDS seri tanımından teyit edilmeden farklı varlıkların tutarları birbirine eklenmemelidir. Eksik haftalar varsa kümülatif toplam yalnızca mevcut gözlemleri kapsar.")
+        st.caption("YTD, yılbaşından son yayımlanan gözleme kadar haftalık EVDS parite hariç değişimlerinin toplamıdır. Değerler milyar USD karşılığıdır; varlık isimleri USD/EUR/XAU kırılımını gösterir.")
     else:
         st.warning("YTD hesaplaması için gerekli haftalık seriler bulunamadı.")
 
 st.subheader("Son Haftanın Sayısal Özeti")
-st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+summary_table = pd.DataFrame(summary_rows)
+for col in ("Seviye", "Nominal", "Parite Hariç", "Parite Etkisi"):
+    summary_table[f"{col} (milyar USD karşılığı)"] = summary_table[col].map(
+        lambda value: f"{value / YP_SCALE:+,.2f}" if pd.notna(value) else "Veri yok"
+    )
+summary_table = summary_table.drop(columns=["Seviye", "Nominal", "Parite Hariç", "Parite Etkisi"])
+st.dataframe(summary_table, use_container_width=True, hide_index=True)
 st.caption("Nominal = stok serisinin haftalık farkı. Parite Hariç ve Parite Etkisi = TCMB'nin ayrı haftalık EVDS serileri. Bu sütunlar otomatik olarak birbirine eşit kabul edilmez.")
 
 st.subheader("Detaylı Veri ve CSV")
@@ -1115,7 +1170,7 @@ if st.button("YP Raporunu E-posta ile Gönder"):
         send_email(
             "YP Mevduat | Haftalık Analiz",
             f"YP mevduat analiz raporu. Son gözlem: {latest_date:%d.%m.%Y}.\n"
-            "Nominal, parite hariç ve parite etkisi ayrı grafiklerde; YTD kümülatif analiz ektedir.",
+            "Nominal ve parite hariç grafikler ile YTD kümülatif analiz ektedir.",
             attachments,
         )
         st.success("Rapor e-posta ile gönderildi.")
