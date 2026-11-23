@@ -66,8 +66,8 @@ st.markdown(
 
 st.title("Mevduat Piyasası | Analiz Paneli")
 st.caption(
-    "TCMB EVDS verileriyle TL ve yabancı para mevduatlarının "
-    "seviyesini, haftalık hareketlerini ve değişim bileşenlerini takip edin."
+    "TL ve yabancı para mevduatındaki haftalık gelişmeleri, "
+    "müşteri ve para birimi bazında inceleyin."
 )
 
 
@@ -124,17 +124,17 @@ YP_LEVEL_SERIES = {
 }
 
 YP_CHANGE_SERIES = {
-    "Parite Hariç - Yurt İçi Yerleşikler": "TP.HPBITABLO5.1",
-    "Parite Hariç - Gerçek Kişiler": "TP.HPBITABLO5.2",
-    "Parite Hariç - Gerçek Kişiler USD": "TP.HPBITABLO5.3",
-    "Parite Hariç - Gerçek Kişiler EUR": "TP.HPBITABLO5.4",
-    "Parite Hariç - Gerçek Kişiler Diğer Döviz": "TP.HPBITABLO5.5",
-    "Parite Hariç - Gerçek Kişiler Altın": "TP.HPBITABLO5.6",
-    "Parite Hariç - Tüzel Kişiler": "TP.HPBITABLO5.7",
-    "Parite Hariç - Tüzel Kişiler USD": "TP.HPBITABLO5.8",
-    "Parite Hariç - Tüzel Kişiler EUR": "TP.HPBITABLO5.9",
-    "Parite Hariç - Tüzel Kişiler Diğer Döviz": "TP.HPBITABLO5.10",
-    "Parite Hariç - Tüzel Kişiler Altın": "TP.HPBITABLO5.11",
+    "Parite Etkisi Hariç - Yurt İçi Yerleşikler": "TP.HPBITABLO5.1",
+    "Parite Etkisi Hariç - Gerçek Kişiler": "TP.HPBITABLO5.2",
+    "Parite Etkisi Hariç - Gerçek Kişiler USD": "TP.HPBITABLO5.3",
+    "Parite Etkisi Hariç - Gerçek Kişiler EUR": "TP.HPBITABLO5.4",
+    "Parite Etkisi Hariç - Gerçek Kişiler Diğer Döviz": "TP.HPBITABLO5.5",
+    "Parite Etkisi Hariç - Gerçek Kişiler Altın": "TP.HPBITABLO5.6",
+    "Parite Etkisi Hariç - Tüzel Kişiler": "TP.HPBITABLO5.7",
+    "Parite Etkisi Hariç - Tüzel Kişiler USD": "TP.HPBITABLO5.8",
+    "Parite Etkisi Hariç - Tüzel Kişiler EUR": "TP.HPBITABLO5.9",
+    "Parite Etkisi Hariç - Tüzel Kişiler Diğer Döviz": "TP.HPBITABLO5.10",
+    "Parite Etkisi Hariç - Tüzel Kişiler Altın": "TP.HPBITABLO5.11",
     "Parite Etkisi - Yurt İçi Yerleşikler": "TP.HPBITABLO5.12",
     "Parite Etkisi - Gerçek Kişiler": "TP.HPBITABLO5.13",
     "Parite Etkisi - Gerçek Kişiler USD": "TP.HPBITABLO5.14",
@@ -415,7 +415,7 @@ def fig_to_png(fig):
     Plotly grafiğini Kaleido kullanmadan Matplotlib ile PNG'ye çevirir.
     """
 
-    mpl_fig, ax = plt.subplots(figsize=(14, 7))
+    mpl_fig, ax = plt.subplots(figsize=(9, 4.5))
 
     has_data = False
 
@@ -534,7 +534,7 @@ def fig_to_png(fig):
     mpl_fig.savefig(
         buffer,
         format="png",
-        dpi=180,
+        dpi=110,
         bbox_inches="tight",
     )
 
@@ -544,8 +544,8 @@ def fig_to_png(fig):
 
     return buffer.getvalue()
 
-def send_email(subject, body, attachments, html_body=None, inline_images=None):
-    """HTML görsellerini CID ile göm; PNG eklerini ayrıca sakla."""
+def send_email(subject, body, attachments=None, html_body=None, inline_images=None):
+    """Grafikleri e-posta gövdesinde küçük boyutlu CID görselleri olarak göster."""
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = GMAIL_ADDRESS
@@ -562,10 +562,9 @@ def send_email(subject, body, attachments, html_body=None, inline_images=None):
         for label, image_bytes in (inline_images or []):
             html_part.add_related(
                 image_bytes, maintype="image", subtype="png",
-                cid=cid_map[label], filename=f"{label}.png",
-                disposition="inline",
+                cid=cid_map[label], disposition="inline",
             )
-    for filename, image_bytes in attachments:
+    for filename, image_bytes in (attachments or []):
         message.add_attachment(
             image_bytes, maintype="image", subtype="png", filename=filename,
         )
@@ -885,10 +884,24 @@ if panel == "TL Mevduat":
                 attachments.append(("mevduat_turleri.png", fig_to_png(fig_person)))
             if fig_maturity is not None:
                 attachments.append(("vadeli_vadesiz.png", fig_to_png(fig_maturity)))
+            tl_inline = [(f"tl_chart_{i}", img) for i, (_, img) in enumerate(attachments)]
+            tl_images_html = "".join(
+                f'<img src="cid:{{{name}}}" width="540" '
+                'style="display:block;width:100%;max-width:540px;height:auto;margin:16px 0;">'
+                for name, _ in tl_inline
+            )
+            tl_html = (
+                '<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;'
+                'font-size:14px;line-height:1.6;color:#172b4d;">'
+                '<p>Merhaba,</p><p>TL mevduata ilişkin güncel grafikler aşağıdadır.</p>'
+                + tl_images_html
+                + '<p>Detaylı analiz için <a href="' + escape(DASHBOARD_URL, quote=True)
+                + '">dashboard’u açabilirsiniz</a>.</p><p>Saygılarımla,</p></div>'
+            )
             send_email(
                 "TL Mevduat | Haftalık Analiz",
-                "Merhaba,\n\nTL mevduat analiz grafikleri ekte yer almaktadır.\n\nSaygılarımla,",
-                attachments
+                "Merhaba,\n\nTL mevduata ilişkin güncel grafikler e-posta içerisindedir.\n\nSaygılarımla,",
+                html_body=tl_html, inline_images=tl_inline,
             )
             st.success("E-posta başarıyla gönderildi.")
         except Exception as e:
@@ -936,7 +949,7 @@ latest_date = yp_df["Tarih"].max()
 SEGMENTS = {"Gerçek Kişiler": "#247BA0", "Tüzel Kişiler": "#F28E2B"}
 CHANGE_COLORS = {
     "Nominal": "#64748B",
-    "Parite Hariç": "#16A34A",
+    "Parite Etkisi Hariç": "#16A34A",
     "Parite Etkisi": "#8B5CF6",
 }
 
@@ -1044,11 +1057,11 @@ for widget, segment in zip((c1, c2), SEGMENTS):
     )
 st.caption("Tutarlar milyar USD karşılığıdır. Toplam YP mevduat stok kartı gösterilmez.")
 
-st.subheader("Haftalık Parite Etkisinden Arındırılmış Değişim")
+st.subheader("Haftalık Parite Etkisi Hariç Değişim")
 parity_main = {
-    "Toplam Yurt İçi Yerleşikler": "Parite Hariç - Yurt İçi Yerleşikler",
-    "Gerçek Kişiler": "Parite Hariç - Gerçek Kişiler",
-    "Tüzel Kişiler": "Parite Hariç - Tüzel Kişiler",
+    "Toplam Yurt İçi Yerleşikler": "Parite Etkisi Hariç - Yurt İçi Yerleşikler",
+    "Gerçek Kişiler": "Parite Etkisi Hariç - Gerçek Kişiler",
+    "Tüzel Kişiler": "Parite Etkisi Hariç - Tüzel Kişiler",
 }
 p1, p2, p3 = st.columns(3)
 for widget, (segment, col) in zip((p1, p2, p3), parity_main.items()):
@@ -1067,7 +1080,7 @@ fig_nominal = plot_weekly_bars(
 )
 st.plotly_chart(fig_nominal, use_container_width=True)
 fig_adjusted = plot_weekly_bars(
-    yp_df, {s: parity_main[s] for s in SEGMENTS}, "Haftalık Parite Hariç Değişim"
+    yp_df, {s: parity_main[s] for s in SEGMENTS}, "Haftalık Parite Etkisi Hariç Değişim"
 )
 st.plotly_chart(fig_adjusted, use_container_width=True)
 fig_parity = plot_weekly_bars(
@@ -1084,7 +1097,7 @@ BREAKDOWN = {
 }
 
 st.subheader("Varlık Türüne Göre Analiz")
-st.caption("Her varlık için mevduat seviyesi, haftalık nominal değişim ve parite hariç değişim gösterilir. Sağdaki etiketler son gözleme aittir. Birim: milyar USD karşılığı.")
+st.caption("Her varlık için mevduat seviyesi, haftalık nominal değişim ve parite etkisi hariç değişim gösterilir. Sağdaki etiketler son gözleme aittir. Birim: milyar USD karşılığı.")
 summary_rows = []
 email_figures = [("ana_seviye", fig_main), ("ana_nominal", fig_nominal),
                  ("ana_parite_haric", fig_adjusted), ("ana_parite_etkisi", fig_parity)]
@@ -1092,7 +1105,7 @@ email_figures = [("ana_seviye", fig_main), ("ana_nominal", fig_nominal),
 for asset in BREAKDOWN:
     with st.expander(f"{asset} | Ayrıntılı Grafikler", expanded=(asset == "USD")):
         level_cols = {s: f"{s} - {asset}" for s in SEGMENTS}
-        adjusted_cols = {s: f"Parite Hariç - {s} {asset}" for s in SEGMENTS}
+        adjusted_cols = {s: f"Parite Etkisi Hariç - {s} {asset}" for s in SEGMENTS}
         parity_cols = {s: f"Parite Etkisi - {s} {asset}" for s in SEGMENTS}
         nominal_df = yp_df[["Tarih"]].copy()
         for segment, level_col in level_cols.items():
@@ -1101,7 +1114,7 @@ for asset in BREAKDOWN:
         charts = [
             ("seviye", plot_lines(yp_df, level_cols, f"{asset} — Mevduat Seviyeleri")),
             ("nominal", plot_weekly_bars(nominal_df, {s: s for s in SEGMENTS}, f"{asset} — Haftalık Nominal Değişim")),
-            ("parite_haric", plot_weekly_bars(yp_df, adjusted_cols, f"{asset} — Parite Hariç Değişim")),
+            ("parite_haric", plot_weekly_bars(yp_df, adjusted_cols, f"{asset} — Parite Etkisi Hariç Değişim")),
         ]
         for kind, fig in charts:
             st.plotly_chart(fig, use_container_width=True)
@@ -1112,11 +1125,11 @@ for asset in BREAKDOWN:
                 "Varlık": asset, "Grup": segment,
                 "Seviye": last_valid(yp_df[lc]) if lc in yp_df else float("nan"),
                 "Nominal": last_valid(nominal_df[segment]) if segment in nominal_df else float("nan"),
-                "Parite Hariç": last_valid(yp_df[ac]) if ac in yp_df else float("nan"),
+                "Parite Etkisi Hariç": last_valid(yp_df[ac]) if ac in yp_df else float("nan"),
                 "Parite Etkisi": last_valid(yp_df[pc]) if pc in yp_df else float("nan"),
             })
 
-st.subheader("Yılbaşından Bugüne | Birikimli Parite Hariç Değişim")
+st.subheader("Yılbaşından Bugüne | Birikimli Parite Etkisi Hariç Değişim")
 selected_start = pd.to_datetime(start_date, format="%d-%m-%Y")
 year_start = pd.Timestamp(latest_date.year, 1, 1)
 if selected_start > year_start:
@@ -1136,7 +1149,7 @@ else:
     summary_by_segment = {segment: [] for segment in SEGMENTS}
     for segment in SEGMENTS:
         for asset in ("USD", "EUR", "Altın"):
-            col = f"Parite Hariç - {segment} {asset}"
+            col = f"Parite Etkisi Hariç - {segment} {asset}"
             if col not in ytd_data:
                 continue
             valid = ytd_data[["Tarih", col]].dropna()
@@ -1147,7 +1160,7 @@ else:
             name = f"{segment} | {asset}"
             color = asset_colors[name]
             ytd_rows.append({"Grup": segment, "Varlık": "XAU (Altın)" if asset == "Altın" else asset,
-                             "YTD Parite Hariç (milyar USD karşılığı)": total})
+                             "YTD Parite Etkisi Hariç (milyar USD karşılığı)": total})
             summary_by_segment[segment].append(f"{asset if asset != 'Altın' else 'XAU'} {total:+,.2f} milyar")
             ytd_fig.add_trace(go.Scatter(
                 x=valid["Tarih"], y=cumulative,
@@ -1162,32 +1175,32 @@ else:
                 bgcolor="rgba(255,255,255,0.95)", bordercolor=color, borderwidth=1,
             )
     if ytd_rows:
-        st.markdown("**YTD parite etkisinden arındırılmış pozisyon değişimleri**")
+        st.markdown("**YTD parite etkisi hariç pozisyon değişimleri**")
         for segment, values in summary_by_segment.items():
             if values:
                 st.markdown(f"**{segment}:** " + " · ".join(values))
-        st.caption("Pozitif (+) değer artışı, negatif (−) değer azalışı gösterir. Bunlar dönem sonu stok pozisyonu değil, yılbaşından beri birikimli parite hariç değişimdir.")
-        ytd_fig.update_layout(title=f"{latest_date.year} YTD — Kümülatif Parite Hariç Değişim")
+        st.caption("Pozitif (+) değer artışı, negatif (−) değer azalışı gösterir. Bunlar dönem sonu stok pozisyonu değil, yılbaşından beri birikimli parite etkisi hariç değişimdir.")
+        ytd_fig.update_layout(title=f"{latest_date.year} YTD — Kümülatif Parite Etkisi Hariç Değişim")
         st.plotly_chart(style_chart(ytd_fig), use_container_width=True)
         ytd_table = pd.DataFrame(ytd_rows)
-        ytd_table["YTD Parite Hariç (milyar USD karşılığı)"] = ytd_table[
-            "YTD Parite Hariç (milyar USD karşılığı)"
+        ytd_table["YTD Parite Etkisi Hariç (milyar USD karşılığı)"] = ytd_table[
+            "YTD Parite Etkisi Hariç (milyar USD karşılığı)"
         ].map(lambda value: f"{value:+,.2f}")
         st.dataframe(ytd_table, use_container_width=True, hide_index=True)
         email_figures.append(("ytd_birikimli_parite_haric", ytd_fig))
-        st.caption("YTD, yılbaşından son yayımlanan gözleme kadar haftalık EVDS parite hariç değişimlerinin toplamıdır. Değerler milyar USD karşılığıdır; varlık isimleri USD/EUR/XAU kırılımını gösterir.")
+        st.caption("YTD, yılbaşından son yayımlanan gözleme kadar haftalık EVDS parite etkisi hariç değişimlerinin toplamıdır. Değerler milyar USD karşılığıdır; varlık isimleri USD/EUR/XAU kırılımını gösterir.")
     else:
         st.warning("YTD hesaplaması için gerekli haftalık seriler bulunamadı.")
 
 st.subheader("Son Haftanın Sayısal Özeti")
 summary_table = pd.DataFrame(summary_rows)
-for col in ("Seviye", "Nominal", "Parite Hariç", "Parite Etkisi"):
+for col in ("Seviye", "Nominal", "Parite Etkisi Hariç", "Parite Etkisi"):
     summary_table[f"{col} (milyar USD karşılığı)"] = summary_table[col].map(
         lambda value: f"{value / YP_SCALE:+,.2f}" if pd.notna(value) else "Veri yok"
     )
-summary_table = summary_table.drop(columns=["Seviye", "Nominal", "Parite Hariç", "Parite Etkisi"])
+summary_table = summary_table.drop(columns=["Seviye", "Nominal", "Parite Etkisi Hariç", "Parite Etkisi"])
 st.dataframe(summary_table, use_container_width=True, hide_index=True)
-st.caption("Nominal = stok serisinin haftalık farkı. Parite Hariç ve Parite Etkisi = TCMB'nin ayrı haftalık EVDS serileri. Bu sütunlar otomatik olarak birbirine eşit kabul edilmez.")
+st.caption("Nominal = stok serisinin haftalık farkı. Parite Etkisi Hariç ve Parite Etkisi = TCMB'nin ayrı haftalık EVDS serileri. Bu sütunlar otomatik olarak birbirine eşit kabul edilmez.")
 
 st.subheader("Detaylı Veri ve CSV")
 st.caption("Verileri müşteri grubu ve gösterim türüne göre filtreleyebilirsiniz. Tutarlar **milyar USD karşılığı** cinsindedir.")
@@ -1202,7 +1215,7 @@ with yp_group_col:
     yp_detail_group = st.selectbox("Müşteri grubu", list(yp_detail_groups), key="yp_detail_group")
 with yp_type_col:
     yp_detail_type = st.selectbox(
-        "Gösterim", ["Mevduat Stoku", "Haftalık Nominal Değişim", "Haftalık Parite Hariç Değişim", "Haftalık Parite Etkisi"],
+        "Gösterim", ["Mevduat Stoku", "Haftalık Nominal Değişim", "Haftalık Parite Etkisi Hariç Değişim", "Haftalık Parite Etkisi"],
         key="yp_detail_type"
     )
 
@@ -1214,7 +1227,7 @@ for yp_name in yp_selected_names:
     elif yp_detail_type == "Haftalık Nominal Değişim":
         yp_source = yp_name
     else:
-        yp_prefix = "Parite Hariç - " if yp_detail_type == "Haftalık Parite Hariç Değişim" else "Parite Etkisi - "
+        yp_prefix = "Parite Etkisi Hariç - " if yp_detail_type == "Haftalık Parite Etkisi Hariç Değişim" else "Parite Etkisi - "
         yp_source = yp_prefix + yp_name.replace(" - ", " ")
         # Genel toplamların EVDS adları tire içerir; varlık bazlı seriler içermez.
         if yp_name in ("Yurt İçi Yerleşikler", "Gerçek Kişiler", "Tüzel Kişiler"):
@@ -1264,7 +1277,7 @@ with yp_full_csv_col:
 def build_management_email(report_df, observation_date, period_start, dashboard_url=""):
     """
     E-posta içeriğini yalnızca EVDS'den gelen rakamlarla hazırlar.
-    Stok: son gözlem, haftalık: aynı gözlemdeki parite hariç akım,
+    Stok: son gözlem, haftalık: aynı gözlemdeki parite etkisi hariç akım,
     YTD: 1 Ocak'tan son gözleme haftalık akımların toplamı.
     """
     assets = (("USD", "USD"), ("EUR", "EUR"), ("XAU (Altın)", "Altın"))
@@ -1277,7 +1290,7 @@ def build_management_email(report_df, observation_date, period_start, dashboard_
     for segment in segments:
         for label, suffix in assets:
             level_col = f"{segment} - {suffix}"
-            change_col = f"Parite Hariç - {segment} {suffix}"
+            change_col = f"Parite Etkisi Hariç - {segment} {suffix}"
             stock = (
                 last_valid(report_df.loc[
                     report_df["Tarih"] <= observation_date, level_col
@@ -1337,9 +1350,9 @@ def build_management_email(report_df, observation_date, period_start, dashboard_
     )
     intro = (
         "Gerçek ve tüzel kişilerin USD, EUR ve altın mevduat stokları, "
-        "haftalık parite etkisinden arındırılmış değişimleri ve "
+        "haftalık parite etkisi hariç değişimleri ve "
         f"{period_start:%d.%m.%Y} tarihinden itibaren birikimli "
-        "parite hariç değişimleri aşağıda sunulmaktadır."
+        "parite etkisi hariç değişimleri aşağıda sunulmaktadır."
     )
     text_rows = [
         f'{r["segment"]} | {r["asset"]} | '
@@ -1352,11 +1365,11 @@ def build_management_email(report_df, observation_date, period_start, dashboard_
         "Merhaba,\n\n" + intro
         + "\n\nBİRİM: MİLYAR USD KARŞILIĞI\n\n"
         + "\n".join(text_rows)
-        + "\n\nYTD PARİTE HARİÇ DEĞİŞİM\n"
+        + "\n\nYTD PARİTE ETKİSİ HARİÇ DEĞİŞİM\n"
         + "Gerçek Kişiler: " + plain_summary("Gerçek Kişiler")
         + "\nTüzel Kişiler: " + plain_summary("Tüzel Kişiler")
         + "\n\nNot: Stoklar dönem sonu bakiyesidir. Haftalık ve YTD "
-          "rakamları parite etkisinden arındırılmış değişimdir; "
+          "rakamları parite etkisi hariç değişimdir; "
           "YTD stok bakiyesi değildir. (+) artış, (-) azalıştır. "
           "Eksik EVDS verileri — ile gösterilir. "
           "YTD haftalık serilerin toplamıdır.\n\n"
@@ -1404,7 +1417,7 @@ def build_management_email(report_df, observation_date, period_start, dashboard_
 <body style="margin:0;padding:28px 12px;background:#f2f5fa;
 font-family:Arial,Helvetica,sans-serif;color:#172b4d;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"
-style="width:100%;max-width:850px;margin:auto;background:#fff;border:1px solid #e1e7f0;
+style="width:100%;max-width:650px;margin:auto;background:#fff;border:1px solid #e1e7f0;
 border-radius:12px;">
 <tr><td style="background:#142c4c;padding:30px 34px;color:#fff;">
 <div style="font-size:12px;letter-spacing:2px;color:#a9c5e5;font-weight:bold;">
@@ -1433,29 +1446,29 @@ style="width:100%;border-collapse:collapse;font-size:13px;">
 </tr></thead><tbody>{''.join(table_rows)}</tbody></table>
 <div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
 &#8594; &nbsp; GRAFİKLERLE HAFTALIK GÖRÜNÜM</div>
-<p style="font-size:12px;color:#64748b;margin:0 0 12px;">Mevduat stokları ve parite etkisinden arındırılmış haftalık değişim</p>
-<div style="font-size:12px;color:#64748b;margin:0 0 8px;">Haftalık parite hariç değişim (milyar USD karşılığı)</div>
+<p style="font-size:12px;color:#64748b;margin:0 0 12px;">Mevduat stokları ve parite etkisi hariç haftalık değişim</p>
+<div style="font-size:12px;color:#64748b;margin:0 0 8px;">Haftalık parite etkisi hariç değişim (milyar USD karşılığı)</div>
 <div style="padding:12px 14px;background:#f3f7fc;border-left:3px solid #247ba0;margin-bottom:8px;font-size:13px;line-height:1.8;">
 <strong>Gerçek Kişiler</strong><br>{html_weekly_summary("Gerçek Kişiler")}</div>
 <div style="padding:12px 14px;background:#f3f7fc;border-left:3px solid #f28e2b;margin-bottom:16px;font-size:13px;line-height:1.8;">
 <strong>Tüzel Kişiler</strong><br>{html_weekly_summary("Tüzel Kişiler")}</div>
-<img src="cid:{{stock_chart}}" alt="Gerçek ve tüzel kişi mevduat stokları" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
-<img src="cid:{{weekly_chart}}" alt="Haftalık parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
+<img src="cid:{{stock_chart}}" alt="Gerçek ve tüzel kişi mevduat stokları" width="540" style="display:block;width:100%;max-width:540px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
+<img src="cid:{{weekly_chart}}" alt="Haftalık parite etkisi hariç değişim" width="540" style="display:block;width:100%;max-width:540px;height:auto;margin:12px 0 22px;border:1px solid #e3e9f1;border-radius:8px;">
 <div style="font-size:13px;font-weight:bold;color:#24466d;margin:30px 0 14px;">
-&#8594; &nbsp; YILBAŞINDAN BUGÜNE PARİTE HARİÇ DEĞİŞİM</div>
+&#8594; &nbsp; YILBAŞINDAN BUGÜNE PARİTE ETKİSİ HARİÇ DEĞİŞİM</div>
 <div style="padding:14px 16px;background:#f3f7fc;border-left:3px solid #247ba0;
 margin-bottom:10px;font-size:13px;line-height:1.8;">
 <strong>Gerçek Kişiler</strong><br>{html_summary("Gerçek Kişiler")}</div>
 <div style="padding:14px 16px;background:#f3f7fc;border-left:3px solid #f28e2b;
 font-size:13px;line-height:1.8;">
 <strong>Tüzel Kişiler</strong><br>{html_summary("Tüzel Kişiler")}</div>
-<img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">
+<img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite etkisi hariç değişim" width="540" style="display:block;width:100%;max-width:540px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">
 {dashboard_html}
 <div style="font-size:13px;font-weight:bold;font-style:italic;color:#64748b;margin:30px 0 12px;">
 &#8594; &nbsp; Metodoloji notu</div>
 <p style="font-size:12px;color:#52647c;line-height:1.7;font-style:italic;">
 YTD dönemi: {period_start:%d.%m.%Y}–{observation_date:%d.%m.%Y}.
-YTD tutarlar, ilgili TCMB EVDS haftalık parite hariç değişim serilerinin
+YTD tutarlar, ilgili TCMB EVDS haftalık parite etkisi hariç değişim serilerinin
 birikimli toplamıdır. Stok tutarlarıyla doğrudan eşitlenmemelidir.
 Artı (+) artışı, eksi (−) azalışı gösterir. Eksik veriler — ile gösterilir.
 Varlık kırılımları USD, EUR ve XAU'dur; tutarlar USD karşılığı bazındadır.</p>
@@ -1472,8 +1485,8 @@ color:#64748b;">Kaynak: TCMB EVDS &nbsp;•&nbsp; Otomatik oluşturulan mevduat 
 st.subheader("E-posta Raporu")
 st.caption(
     "HTML e-posta: gerçek/tüzel kişi bazında "
-    "USD, EUR ve XAU stokları, haftalık ve YTD parite hariç değişimleri. "
-    "Özet grafikler PNG eki olarak gönderilir."
+    "USD, EUR ve XAU stokları, haftalık ve YTD parite etkisi hariç değişimleri. "
+    "Grafikler e-posta içerisinde gösterilir; ayrıca dosya eki gönderilmez."
 )
 if st.button("E-posta Gönder", type="primary"):
     try:
@@ -1493,8 +1506,8 @@ if st.button("E-posta Gönder", type="primary"):
             mail_df, latest_date, year_start, DASHBOARD_URL
         )
         # Yönetime okunabilir bir e-posta: esas tablo mesaj gövdesinde;
-        # yalnızca özet grafikler ekte.
-        # Grafikler hem e-postanın içinde görünür hem PNG eki olarak saklanır.
+        # özet grafikler e-posta gövdesinde.
+        # Grafikler yalnızca e-posta gövdesinde gösterilir.
         inline_images = [
             ("stock_chart", fig_to_png(fig_main)),
             ("weekly_chart", fig_to_png(fig_adjusted)),
@@ -1504,15 +1517,15 @@ if st.button("E-posta Gönder", type="primary"):
         else:
             # Eksik YTD grafiği varsa kırık görsel yerine açıklama göster.
             html_body = html_body.replace(
-                '<img src="cid:{{ytd_chart}}" alt="Yılbaşından bugüne birikimli parite hariç değişim" width="740" style="display:block;width:100%;max-width:740px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">',
+                '<img src="cid:{ytd_chart}" alt="Yılbaşından bugüne birikimli parite etkisi hariç değişim" width="540" style="display:block;width:100%;max-width:540px;height:auto;margin:20px 0 24px;border:1px solid #e3e9f1;border-radius:8px;">',
                 '<p style="color:#64748b;font-size:12px;">YTD grafik verisi bulunamadı.</p>',
             )
-        attachments = [(f"{name}.png", png) for name, png in inline_images]
         send_email(
-            subject, plain_body, attachments,
+            subject, plain_body,
             html_body=html_body, inline_images=inline_images,
         )
         st.success("E-posta başarıyla gönderildi.")
     except Exception as exc:
         st.error(f"E-posta gönderilemedi: {exc}")
+
 
