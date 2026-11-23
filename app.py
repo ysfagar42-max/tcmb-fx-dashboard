@@ -476,8 +476,15 @@ def fig_to_png(fig):
             left, right = min(xnum), max(xnum)
             span = max(right - left, 7)
             ax.set_xlim(left - span * 0.04, right + span * 0.21)
-            locator = _dates.AutoDateLocator(minticks=3, maxticks=5)
-            ax.xaxis.set_major_locator(locator)
+            # Etiketler için sağda boşluk var; tarih ekseninde ise yalnızca
+            # GERÇEK veri aralığındaki tarihler gösterilir. AutoDateLocator
+            # sağdaki boşluğa gelecekteki bir tarihi (örn. 01.01.2027) koyabiliyordu.
+            import numpy as np
+            observed_dates = sorted(set(xnum))
+            tick_count = min(5, len(observed_dates))
+            positions = np.linspace(0, len(observed_dates) - 1, tick_count)
+            ticks = [observed_dates[round(i)] for i in positions]
+            ax.set_xticks(sorted(set(ticks)))
             ax.xaxis.set_major_formatter(_dates.DateFormatter("%d.%m.%y"))
             mpl_fig.autofmt_xdate(rotation=25, ha="right")
             # autofmt_xdate alt boşluğu değiştirebildiğinden sabit düzene geri dön.
