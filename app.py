@@ -416,7 +416,7 @@ def fig_to_png(fig):
 
     mpl_fig, ax = plt.subplots(figsize=(9, 5.2), dpi=110)
     # Sağda son değerler, altta lejant için sabit alan bırakılır.
-    mpl_fig.subplots_adjust(left=0.13, right=0.79, top=0.83, bottom=0.29)
+    mpl_fig.subplots_adjust(left=0.13, right=0.86, top=0.83, bottom=0.29)
     has_data = False
     last_points = []
     all_dates = []
@@ -475,7 +475,7 @@ def fig_to_png(fig):
             xnum = [_dates.date2num(pd.Timestamp(v).to_pydatetime()) for v in all_dates]
             left, right = min(xnum), max(xnum)
             span = max(right - left, 7)
-            ax.set_xlim(left - span * 0.04, right + span * 0.21)
+            ax.set_xlim(left - span * 0.04, right + span * 0.11)
             # Etiketler için sağda boşluk var; tarih ekseninde ise yalnızca
             # GERÇEK veri aralığındaki tarihler gösterilir. AutoDateLocator
             # sağdaki boşluğa gelecekteki bir tarihi (örn. 01.01.2027) koyabiliyordu.
@@ -488,7 +488,7 @@ def fig_to_png(fig):
             ax.xaxis.set_major_formatter(_dates.DateFormatter("%d.%m.%y"))
             mpl_fig.autofmt_xdate(rotation=25, ha="right")
             # autofmt_xdate alt boşluğu değiştirebildiğinden sabit düzene geri dön.
-            mpl_fig.subplots_adjust(left=0.13, right=0.79, top=0.83, bottom=0.29)
+            mpl_fig.subplots_adjust(left=0.13, right=0.86, top=0.83, bottom=0.29)
         except (ValueError, TypeError):
             pass
 
