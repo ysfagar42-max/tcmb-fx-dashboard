@@ -411,137 +411,108 @@ def add_line_end_labels(fig, decimals=2):
 
 
 def fig_to_png(fig):
-    """
-    Plotly grafiğini Kaleido kullanmadan Matplotlib ile PNG'ye çevirir.
-    """
+    """E-posta için sabit boyutlu, etiketleri taşmayan PNG üretir."""
+    import matplotlib.ticker as mticker
 
-    mpl_fig, ax = plt.subplots(figsize=(9, 4.5))
-
+    mpl_fig, ax = plt.subplots(figsize=(9, 5.2), dpi=110)
+    # Sağda son değerler, altta lejant için sabit alan bırakılır.
+    mpl_fig.subplots_adjust(left=0.13, right=0.79, top=0.83, bottom=0.29)
     has_data = False
+    last_points = []
+    all_dates = []
 
     for trace in fig.data:
-
         x = list(trace.x) if trace.x is not None else []
         y = list(trace.y) if trace.y is not None else []
-
-        if not x or not y:
+        valid = [(xv, float(yv)) for xv, yv in zip(x, y)
+                 if pd.notna(xv) and pd.notna(yv)]
+        if not valid:
             continue
-
-        color = None
-
+        xx, yy = zip(*valid)
+        all_dates.extend(xx)
+        name = trace.name or "Seri"
+        trace_color = getattr(getattr(trace, "line", None), "color", None)
+        if not isinstance(trace_color, str):
+            trace_color = None
         if trace.type == "bar":
-
-            bars = ax.bar(
-                x,
-                y,
-                label=trace.name or "Seri",
-                alpha=0.8,
-                width=2.2 if len(x) > 1 else 0.6,
-            )
-            # Son haftanın tutarını her seri için çubuk üzerinde göster.
-            valid_indices = [i for i, v in enumerate(y) if pd.notna(v)]
-            if valid_indices:
-                idx = valid_indices[-1]
-                last_bar = bars[idx]
-                last_y = float(y[idx])
-                ax.annotate(
-                    f"{last_y:+,.2f}",
-                    xy=(last_bar.get_x() + last_bar.get_width() / 2, last_y),
-                    xytext=(0, -13 if last_y < 0 else 7),
-                    textcoords="offset points", ha="center",
-                    va="top" if last_y < 0 else "bottom",
-                    fontsize=9, fontweight="bold",
-                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.9),
-                )
+            color = getattr(getattr(trace, "marker", None), "color", None)
+            if not isinstance(color, str):
+                color = None
+            bars = ax.bar(xx, yy, label=name, alpha=0.83,
+                          width=2.2 if len(xx) > 1 else 0.6, color=color)
+            last_bar = bars[-1]
+            last_points.append((xx[-1], yy[-1], last_bar.get_facecolor(), True))
             has_data = True
-
         elif trace.type == "scatter":
-
             mode = trace.mode or "lines"
-
             if "lines" in mode:
-                ax.plot(
-                    x,
-                    y,
-                    label=trace.name or "Seri",
-                    linewidth=2,
-                )
-
-                valid_points = [
-                    (xv, yv)
-                    for xv, yv in zip(x, y)
-                    if pd.notna(xv) and pd.notna(yv)
-                ]
-
-                if valid_points:
-                    last_x, last_y = valid_points[-1]
-
-                    ax.annotate(
-                        f"{last_y:,.2f}",
-                        xy=(last_x, last_y),
-                        xytext=(8, 0),
-                        textcoords="offset points",
-                        fontsize=9,
-                    )
-
+                line, = ax.plot(xx, yy, label=name, linewidth=2, color=trace_color)
+                last_points.append((xx[-1], yy[-1], line.get_color(), False))
                 has_data = True
-
             elif "markers" in mode:
-                ax.scatter(
-                    x,
-                    y,
-                    label=trace.name or "Seri",
-                )
-
+                ax.scatter(xx, yy, label=name, color=trace_color)
                 has_data = True
 
-    title = ""
+    title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else ""
+    y_title = (fig.layout.yaxis.title.text
+               if fig.layout.yaxis and fig.layout.yaxis.title else "")
+    x_title = (fig.layout.xaxis.title.text
+               if fig.layout.xaxis and fig.layout.xaxis.title else "")
+    # Uzun başlıkları iki satıra bölerek görsel dışına çıkmasını önle.
+    import textwrap
+    ax.set_title("\n".join(textwrap.wrap(title, width=49)),
+                 fontsize=12, fontweight="bold", pad=16)
+    ax.set_xlabel(x_title or "Tarih", fontsize=9)
+    ax.set_ylabel(y_title, fontsize=9)
+    ax.tick_params(axis="both", labelsize=8)
+    ax.grid(True, alpha=0.2)
+    ax.set_axisbelow(True)
+    ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:,.1f}"))
 
-    if fig.layout.title and fig.layout.title.text:
-        title = fig.layout.title.text
+    if all_dates:
+        try:
+            import matplotlib.dates as _dates
+            xnum = [_dates.date2num(pd.Timestamp(v).to_pydatetime()) for v in all_dates]
+            left, right = min(xnum), max(xnum)
+            span = max(right - left, 7)
+            ax.set_xlim(left - span * 0.04, right + span * 0.21)
+            locator = _dates.AutoDateLocator(minticks=3, maxticks=5)
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(_dates.DateFormatter("%d.%m.%y"))
+            mpl_fig.autofmt_xdate(rotation=25, ha="right")
+            # autofmt_xdate alt boşluğu değiştirebildiğinden sabit düzene geri dön.
+            mpl_fig.subplots_adjust(left=0.13, right=0.79, top=0.83, bottom=0.29)
+        except (ValueError, TypeError):
+            pass
 
-    x_title = ""
-    y_title = ""
-
-    if fig.layout.xaxis and fig.layout.xaxis.title:
-        x_title = fig.layout.xaxis.title.text or ""
-
-    if fig.layout.yaxis and fig.layout.yaxis.title:
-        y_title = fig.layout.yaxis.title.text or ""
-
-    ax.set_title(title, fontsize=15, fontweight="bold", pad=18)
-    ax.set_xlabel(x_title)
-    ax.set_ylabel(y_title)
-
-    ax.grid(True, alpha=0.25)
+    # Son değer etiketlerini grafik alanının İÇİNDE tut.
+    # Birbirine çok yakın etiketleri dikey olarak ayır.
+    if last_points:
+        ylow, yhigh = ax.get_ylim()
+        yrange = max(yhigh - ylow, 1e-8)
+        placed = []
+        for x, y, color, is_bar in sorted(last_points, key=lambda v: v[1]):
+            label_y = max(ylow + 0.06 * yrange, min(y, yhigh - 0.06 * yrange))
+            for prior in placed:
+                if abs(label_y - prior) < 0.075 * yrange:
+                    label_y = min(prior + 0.075 * yrange, yhigh - 0.05 * yrange)
+            placed.append(label_y)
+            ax.annotate(f"{y:+,.2f}" if is_bar else f"{y:,.2f}",
+                        xy=(x, label_y), xytext=(7, 0), textcoords="offset points",
+                        fontsize=8, fontweight="bold", color=color,
+                        ha="left", va="center", clip_on=True,
+                        bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                                  ec="none", alpha=0.88))
 
     if has_data:
-        ax.legend(loc="best", fontsize=9)
-
-    # Tarih eksenini okunabilir hale getir.
-    try:
-        ax.xaxis.set_major_formatter(
-            mdates.DateFormatter("%d.%m.%Y")
-        )
-        mpl_fig.autofmt_xdate()
-    except Exception:
-        pass
-
-    mpl_fig.tight_layout()
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.32),
+                  ncol=2, fontsize=8, frameon=False, borderaxespad=0)
 
     buffer = io.BytesIO()
-
-    mpl_fig.savefig(
-        buffer,
-        format="png",
-        dpi=110,
-        bbox_inches="tight",
-    )
-
+    # bbox_inches=tight kullanılmaz: e-posta görselinin genişliğini büyütür.
+    mpl_fig.savefig(buffer, format="png", dpi=110, facecolor="white")
     plt.close(mpl_fig)
-
     buffer.seek(0)
-
     return buffer.getvalue()
 
 def send_email(subject, body, attachments=None, html_body=None, inline_images=None):
